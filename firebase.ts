@@ -1,5 +1,10 @@
 import { initializeApp } from "firebase/app";
-import { getAnalytics } from "firebase/analytics";
+import { getFirestore } from "firebase/firestore";
+import { getAuth } from "firebase/auth";
+import { FirebaseError } from "firebase/app";
+import { ref } from "firebase/storage";
+import { updateDoc } from "firebase/firestore";
+import { arrayUnion } from "firebase/firestore";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAoOaTe-LmN91oF3YINYWfntXjy_xVMUS0",
@@ -8,10 +13,15 @@ const firebaseConfig = {
   storageBucket: "kovaszakademia.firebasestorage.app",
   messagingSenderId: "239696862556",
   appId: "1:239696862556:web:879dd3b88d364fdd5ab599",
-  measurementId: "G-2D9EZ2TBQ3"
+  measurementId: "G-2D9EZ2TBQ3",
 };
 
+// Inicializálja a Firebase alkalmazást
 const app = initializeApp(firebaseConfig);
-const analytics = getAnalytics(app);
 
-export { app, analytics };
+// Inicializálja a Firestore-t
+const db = getFirestore(app);
+const auth = getAuth(app);
+const error = FirebaseError;
+
+export { db, auth, error, ref, updateDoc, arrayUnion };

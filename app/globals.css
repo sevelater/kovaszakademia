@@ -5,3 +5,20 @@
   --second: #fffcff;
   --third: #685b53;
 }
+
+.react-calendar {
+  border-radius: 8px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  background-color: #f9fafb;
+}
+.react-calendar__tile--active {
+  background: #ebac25 !important;
+  color: white !important;
+}
+.react-calendar__tile--hasActive {
+  background: #dbeafe !important;
+}
+
+button {
+  cursor: pointer;
+}

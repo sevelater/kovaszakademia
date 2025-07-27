@@ -5,11 +5,8 @@ import Tabs from "./components/tabs/Tabs"; // Importálás az új helyről
 
 export default function Page() {
   return (
-    <div className="bg-[var(--first)] h-screen overflow-hidden">
-      <div className="w-full">
-        {/* <img src="/jenoi_kep.jpg" alt=""></img> */}
-      </div>
-      <main className="w-full m-10">
+    <div className="bg-[var(--first)] min-h-screen overflow-hidden">
+      <main className="w-full">
         <Tabs />
       </main>
     </div>
