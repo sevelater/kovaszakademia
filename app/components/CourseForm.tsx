@@ -1,11 +1,10 @@
-
-//alapértelmezett létszám megadása itt található
-
 "use client";
 
 import React, { useState } from "react";
-import { db } from "../../firebase"; // Igazítsd a saját elérési utadhoz, ha szükséges
+import { db, storage } from "../../firebase";
 import { addDoc, collection, setDoc, doc } from "firebase/firestore";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { v4 } from "uuid";
 
 const categories = [
   "Pékeknek és pékségeknek",
@@ -27,8 +26,8 @@ type Course = {
   categories: string[];
   datetime?: string;
   images?: string[];
-  maxCapacity: number; // Új mező: maximális létszám
-  registeredUsers: { uid: string; displayName: string }[]; // Új mező: jelentkezők
+  maxCapacity: number;
+  registeredUsers: { uid: string; displayName: string }[];
 };
 
 type Props = {
@@ -39,11 +38,23 @@ type Props = {
   isAdmin: boolean;
 };
 
-export default function CourseForm({ mode, course, setCourses, setShowForm, isAdmin }: Props) {
+export default function CourseForm({
+  mode,
+  course,
+  setCourses,
+  setShowForm,
+  isAdmin,
+}: Props) {
   const years = Array.from({ length: 6 }, (_, i) => 2025 + i);
-  const months = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, "0"));
-  const days = Array.from({ length: 31 }, (_, i) => String(i + 1).padStart(2, "0"));
-  const hours = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, "0"));
+  const months = Array.from({ length: 12 }, (_, i) =>
+    String(i + 1).padStart(2, "0")
+  );
+  const days = Array.from({ length: 31 }, (_, i) =>
+    String(i + 1).padStart(2, "0")
+  );
+  const hours = Array.from({ length: 24 }, (_, i) =>
+    String(i).padStart(2, "0")
+  );
   const minutes = ["00", "15", "30", "45"];
 
   const [form, setForm] = useState({
@@ -60,8 +71,23 @@ export default function CourseForm({ mode, course, setCourses, setShowForm, isAd
     day: course?.datetime ? course.datetime.split("T")[0].split("-")[2] : "",
     hour: course?.datetime ? course.datetime.split("T")[1].split(":")[0] : "",
     minute: course?.datetime ? course.datetime.split("T")[1].split(":")[1] : "",
-    maxCapacity: course?.maxCapacity?.toString() || "", // Alapértelmezett érték
+    maxCapacity: course?.maxCapacity?.toString() || "",
   });
+
+  const [img1, setImg1] = useState<File | undefined>(undefined);
+  const [img2, setImg2] = useState<File | undefined>(undefined);
+  const [img3, setImg3] = useState<File | undefined>(undefined);
+  const [imgPreview1, setImgPreview1] = useState<string>(
+    course?.images?.[0] || ""
+  );
+  const [imgPreview2, setImgPreview2] = useState<string>(
+    course?.images?.[1] || ""
+  );
+  const [imgPreview3, setImgPreview3] = useState<string>(
+    course?.images?.[2] || ""
+  );
+  const [loading, setLoading] = useState<boolean>(false);
+  const [progress, setProgress] = useState<string>("");
 
   const handleCategoryToggle = (category: string) => {
     setForm((prev) => ({
@@ -73,7 +99,9 @@ export default function CourseForm({ mode, course, setCourses, setShowForm, isAd
   };
 
   const handleFormChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+    >
   ) => {
     const { name, value } = e.target;
     setForm((prev) => {
@@ -90,6 +118,26 @@ export default function CourseForm({ mode, course, setCourses, setShowForm, isAd
     });
   };
 
+  const handleImageSelection = (
+    e: React.ChangeEvent<HTMLInputElement>,
+    setImage: React.Dispatch<React.SetStateAction<File | undefined>>,
+    setPreview: React.Dispatch<React.SetStateAction<string>>
+  ) => {
+    const file = e.target.files?.[0];
+    setImage(file);
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e: ProgressEvent<FileReader>) => {
+        if (e.target?.result) {
+          setPreview(e.target.result as string);
+        }
+      };
+      reader.readAsDataURL(file);
+    } else {
+      setPreview("");
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!isAdmin) {
@@ -101,7 +149,44 @@ export default function CourseForm({ mode, course, setCourses, setShowForm, isAd
       alert("A maximális létszám legalább 1 kell legyen!");
       return;
     }
+
+    setLoading(true);
+    setProgress("Képek feltöltése és tanfolyam mentése...");
+
     try {
+      const startTime = performance.now();
+      const courseId = mode === "create" ? v4() : course!.id!;
+      const imageRefs = [
+        img1 ? ref(storage, `courses/${courseId}/${v4()}`) : null,
+        img2 ? ref(storage, `courses/${courseId}/${v4()}`) : null,
+        img3 ? ref(storage, `courses/${courseId}/${v4()}`) : null,
+      ];
+
+      let imgLinks: string[] = [];
+
+      // Képek feltöltése
+      if (img1 && imageRefs[0]) {
+        await uploadBytes(imageRefs[0], img1);
+        imgLinks.push(await getDownloadURL(imageRefs[0]));
+      } else {
+        imgLinks.push(course?.images?.[0] || "");
+      }
+      if (img2 && imageRefs[1]) {
+        await uploadBytes(imageRefs[1], img2);
+        imgLinks.push(await getDownloadURL(imageRefs[1]));
+      } else {
+        imgLinks.push(course?.images?.[1] || "");
+      }
+      if (img3 && imageRefs[2]) {
+        await uploadBytes(imageRefs[2], img3);
+        imgLinks.push(await getDownloadURL(imageRefs[2]));
+      } else {
+        imgLinks.push(course?.images?.[2] || "");
+      }
+
+      // Csak a létező képeket tartjuk meg
+      imgLinks = imgLinks.filter((url) => url !== "");
+
       const courseData = {
         title: form.title,
         price: parseInt(form.price),
@@ -111,45 +196,80 @@ export default function CourseForm({ mode, course, setCourses, setShowForm, isAd
         description: form.description,
         categories: form.categories,
         datetime: form.datetime,
-        images: course?.images || [],
-        maxCapacity: maxCapacity, // Számként mentjük
-        registeredUsers: course?.registeredUsers || [], // Üres tömb új tanfolyamnál
+        images: imgLinks,
+        maxCapacity,
+        registeredUsers: course?.registeredUsers || [],
       };
+
       if (courseData.datetime && !isNaN(new Date(courseData.datetime).getTime())) {
+        console.log("Starting Firestore write...");
+        const firestoreTimeout = new Promise<never>((_, reject) =>
+          setTimeout(
+            () => reject(new Error("Firestore write timed out after 10 seconds")),
+            10000
+          )
+        );
+
         if (mode === "create") {
-          const docRef = await addDoc(collection(db, "courses"), {
-            ...courseData,
-            registeredUsers: [], // Üres tömb új tanfolyamnál
-          });
-          setCourses((prev) => [...prev, { ...courseData, id: docRef.id }].sort((a, b) => {
-            if (!a.datetime || !b.datetime) return 0;
-            return new Date(a.datetime).getTime() - new Date(b.datetime).getTime();
-          }));
+          const docRef = await Promise.race([
+            addDoc(collection(db, "courses"), courseData),
+            firestoreTimeout,
+          ]);
+          setCourses((prev) =>
+            [...prev, { ...courseData, id: docRef.id }].sort((a, b) => {
+              if (!a.datetime || !b.datetime) return 0;
+              return (
+                new Date(a.datetime).getTime() - new Date(b.datetime).getTime()
+              );
+            })
+          );
         } else {
-          await setDoc(doc(db, "courses", course!.id!), courseData);
+          await Promise.race([
+            setDoc(doc(db, "courses", course!.id!), courseData),
+            firestoreTimeout,
+          ]);
           setCourses((prev) =>
             prev
-              .map((c) => (c.id === course!.id ? { ...courseData, id: course!.id } : c))
+              .map((c) =>
+                c.id === course!.id ? { ...courseData, id: course!.id } : c
+              )
               .sort((a, b) => {
                 if (!a.datetime || !b.datetime) return 0;
-                return new Date(a.datetime).getTime() - new Date(b.datetime).getTime();
+                return (
+                  new Date(a.datetime).getTime() - new Date(b.datetime).getTime()
+                );
               })
           );
         }
+        const duration = (performance.now() - startTime) / 1000;
+        console.log(`Firestore write completed in ${duration} seconds`);
+        console.log(`Total submit time: ${duration} seconds`);
         setShowForm("");
-        alert(`Tanfolyam sikeresen ${mode === "create" ? "létrehozva" : "szerkesztve"}!`);
+        alert(
+          `Tanfolyam sikeresen ${mode === "create" ? "létrehozva" : "szerkesztve"}!`
+        );
       } else {
         alert("Érvénytelen időpont formátum! Kérlek, adj meg érvényes időpontot.");
       }
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Hiba a tanfolyam mentése során:", error);
-      alert("Hiba történt a tanfolyam mentése közben.");
+      const errorMessage = error instanceof Error ? error.message : "Ismeretlen hiba";
+      alert(`Hiba történt: ${errorMessage}`);
+    } finally {
+      setLoading(false);
+      setProgress("");
     }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="bg-white p-6 rounded-md shadow space-y-4 max-w-5xl">
-      <h2 className="text-xl font-bold">{mode === "create" ? "Új tanfolyam létrehozása" : "Tanfolyam szerkesztése"}</h2>
+    <form
+      onSubmit={handleSubmit}
+      className="bg-white p-6 rounded-md shadow space-y-4 max-w-5xl"
+    >
+      <h2 className="text-xl font-bold">
+        {mode === "create" ? "Új tanfolyam létrehozása" : "Tanfolyam szerkesztése"}
+      </h2>
+      {progress && <div className="text-center text-gray-600">{progress}</div>}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <input
           type="text"
@@ -271,6 +391,56 @@ export default function CourseForm({ mode, course, setCourses, setShowForm, isAd
           </div>
         </div>
       </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="flex flex-col">
+          <label className="font-semibold mb-1">1. Kép</label>
+          <input
+            type="file"
+            accept="image/*"
+            onChange={(e) => handleImageSelection(e, setImg1, setImgPreview1)}
+            className="p-2 border rounded-md"
+          />
+          {imgPreview1 && (
+            <img
+              src={imgPreview1}
+              alt="1. Kép előnézet"
+              className="mt-2 rounded-md h-auto w-full max-w-[200px]"
+            />
+          )}
+        </div>
+        <div className="flex flex-col">
+          <label className="font-semibold mb-1">2. Kép</label>
+          <input
+            type="file"
+            accept="image/*"
+            onChange={(e) => handleImageSelection(e, setImg2, setImgPreview2)}
+            className="p-2 border rounded-md"
+          />
+          {imgPreview2 && (
+            <img
+              src={imgPreview2}
+              alt="2. Kép előnézet"
+              className="mt-2 rounded-md h-auto w-full max-w-[200px]"
+            />
+          )}
+        </div>
+        <div className="flex flex-col">
+          <label className="font-semibold mb-1">3. Kép</label>
+          <input
+            type="file"
+            accept="image/*"
+            onChange={(e) => handleImageSelection(e, setImg3, setImgPreview3)}
+            className="p-2 border rounded-md"
+          />
+          {imgPreview3 && (
+            <img
+              src={imgPreview3}
+              alt="3. Kép előnézet"
+              className="mt-2 rounded-md h-auto w-full max-w-[200px]"
+            />
+          )}
+        </div>
+      </div>
       <div>
         <label className="font-semibold block mb-1">Kategóriák</label>
         <div className="flex flex-wrap gap-2">
@@ -310,13 +480,15 @@ export default function CourseForm({ mode, course, setCourses, setShowForm, isAd
         <button
           type="submit"
           className="bg-[var(--first)] transition-all duration-200 text-[var(--second)] px-6 py-2 rounded-md hover:bg-[var(--first)]/80 hover:cursor-pointer"
+          disabled={loading}
         >
-          Mentés
+          {loading ? "Mentés folyamatban..." : "Mentés"}
         </button>
         <button
           type="button"
           onClick={() => setShowForm("")}
           className="ml-2 px-6 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600"
+          disabled={loading}
         >
           Mégse
         </button>

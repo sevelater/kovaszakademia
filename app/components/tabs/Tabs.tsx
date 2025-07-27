@@ -196,7 +196,6 @@ const Tabs: React.FC = () => {
       <div className="flex-1">
         <div className="flex justify-between items-center mb-6">
           <p className="mr-1.5">Üdv, {user.displayName}! </p>
-          <p>{isAdmin && "(Admin)"}</p>
           <button
             onClick={handleSignOut}
             className="ml-5 px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600"

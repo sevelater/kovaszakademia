@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { db, auth } from "../../../firebase";
 import {
   doc,
@@ -11,6 +11,7 @@ import {
   arrayRemove,
 } from "firebase/firestore";
 import { User } from "firebase/auth";
+import { loadStripe } from "@stripe/stripe-js";
 
 interface Course {
   id?: string;
@@ -27,8 +28,11 @@ interface Course {
   registeredUsers: { uid: string; displayName: string }[];
 }
 
+const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
+
 const CourseDetails: React.FC = () => {
   const { id } = useParams();
+  const searchParams = useSearchParams();
   const [course, setCourse] = useState<Course | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [authLoading, setAuthLoading] = useState<boolean>(true);
@@ -36,6 +40,7 @@ const CourseDetails: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
   const [isRegistered, setIsRegistered] = useState<boolean>(false);
   const [currentImg, setCurrentImg] = useState<number>(0);
+  const [paymentLoading, setPaymentLoading] = useState<boolean>(false);
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(async (currentUser) => {
@@ -99,29 +104,29 @@ const CourseDetails: React.FC = () => {
     }
   }, [id, user]);
 
-  const handleRegister = async () => {
+  const registerUser = async () => {
     if (authLoading) {
       alert("Kérlek várj, a hitelesítési állapot még betöltés alatt!");
-      return;
+      return false;
     }
     if (!user || !user.uid) {
       alert("Bejelentkezés szükséges a jelentkezéshez!");
-      return;
+      return false;
     }
     if (!course?.id) {
       alert("Érvénytelen kurzus!");
-      return;
+      return false;
     }
     if (course.registeredUsers.length >= course.maxCapacity) {
       alert("A kurzus betelt!");
-      return;
+      return false;
     }
     try {
       const courseRef = doc(db, "courses", course.id);
       const courseSnap = await getDoc(courseRef);
       if (!courseSnap.exists()) {
         alert("A kurzus nem létezik!");
-        return;
+        return false;
       }
       const currentUsers = courseSnap.data().registeredUsers || [];
       if (
@@ -130,7 +135,7 @@ const CourseDetails: React.FC = () => {
         )
       ) {
         alert("Már jelentkeztél erre a kurzusra!");
-        return;
+        return false;
       }
       await updateDoc(courseRef, {
         registeredUsers: arrayUnion({
@@ -151,12 +156,18 @@ const CourseDetails: React.FC = () => {
       );
       setIsRegistered(true);
       alert("Sikeres jelentkezés!");
+      return true;
     } catch (error: unknown) {
       console.error("Hiba a jelentkezés során:", error);
       const errorMessage =
         error instanceof Error ? error.message : "Ismeretlen hiba";
       alert(`Hiba történt a jelentkezés közben: ${errorMessage}`);
+      return false;
     }
+  };
+
+  const handleRegister = async () => {
+    await registerUser();
   };
 
   const handleUnregister = async () => {
@@ -212,6 +223,85 @@ const CourseDetails: React.FC = () => {
     }
   };
 
+  const handlePayment = async () => {
+    if (!user || !user.uid || !user.email) {
+      alert("Bejelentkezés szükséges, és az email cím nem lehet üres!");
+      return;
+    }
+    if (!course || !course.id || !course.title || !course.price) {
+      alert("Érvénytelen kurzus adatok!");
+      return;
+    }
+    setPaymentLoading(true);
+    try {
+      const response = await fetch("/api/create-checkout-session", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          courseId: course.id,
+          courseTitle: course.title,
+          coursePrice: course.price,
+          userId: user.uid,
+          userEmail: user.email,
+        }),
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        console.error("API response not OK:", { status: response.status, body: text });
+        throw new Error(`API error: ${response.status} - ${text}`);
+      }
+
+      const contentType = response.headers.get("content-type") || "";
+      if (!contentType.includes("application/json")) {
+        const text = await response.text();
+        console.error("Non-JSON response:", { contentType, body: text });
+        throw new Error("Received non-JSON response from API");
+      }
+
+      const data: { sessionId: string } = await response.json();
+      if (!data.sessionId) {
+        console.error("Missing sessionId in API response:", data);
+        throw new Error("Stripe session ID missing in response");
+      }
+
+      const stripe = await stripePromise;
+      if (!stripe) {
+        console.error("Stripe initialization failed");
+        throw new Error("Stripe initialization failed");
+      }
+
+      const { error } = await stripe.redirectToCheckout({ sessionId: data.sessionId });
+      if (error) {
+        console.error("Stripe checkout error:", error);
+        throw new Error(`Stripe checkout error: ${error.message}`);
+      }
+    } catch (error: unknown) {
+      console.error("Hiba a fizetési folyamat során:", error);
+      const errorMessage = error instanceof Error ? error.message : "Ismeretlen hiba";
+      alert(`Hiba történt a fizetés közben: ${errorMessage}`);
+    } finally {
+      setPaymentLoading(false);
+    }
+  };
+
+  // Automatically register user after successful payment
+  useEffect(() => {
+    const paymentStatus = searchParams.get("payment");
+    if (
+      paymentStatus === "success" &&
+      user &&
+      user.uid &&
+      course &&
+      course.id &&
+      !isRegistered
+    ) {
+      registerUser();
+    }
+  }, [searchParams, user, course, isRegistered]);
+
   if (authLoading || loading) {
     return <div className="p-6 text-center">Betöltés...</div>;
   }
@@ -225,8 +315,9 @@ const CourseDetails: React.FC = () => {
   const isFull = remainingSpots <= 0;
 
   return (
-    <div className="p-6 max-w-5xl mx-auto flex gap-6">
-      <div className="w-2/3">
+    <div className="p-6 flex gap-6 bg-[var(--first)] min-h-screen">
+      <a className="text-[var(--second)] font-medium tracking-wider p-1.5 rounded-md bg-[var(--third)] h-min" href="../">Kovász Akadémia</a>
+      <div className="w-3/4 max-w-5xl">
         <div className="relative bg-gray-200 h-64 rounded-md mb-4 overflow-hidden">
           {imgs.length > 0 ? (
             <>
@@ -235,7 +326,6 @@ const CourseDetails: React.FC = () => {
                 alt={`Kép ${currentImg + 1}`}
                 className="object-cover w-full h-full"
               />
-              {/* Prev gomb */}
               {imgs.length > 1 && (
                 <button
                   onClick={() =>
@@ -246,7 +336,6 @@ const CourseDetails: React.FC = () => {
                   ‹
                 </button>
               )}
-              {/* Next gomb */}
               {imgs.length > 1 && (
                 <button
                   onClick={() => setCurrentImg((i) => (i + 1) % imgs.length)}
@@ -255,7 +344,6 @@ const CourseDetails: React.FC = () => {
                   ›
                 </button>
               )}
-              {/* kis előnézet pöttyök */}
               <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 flex gap-1">
                 {imgs.map((_, idx) => (
                   <span
@@ -270,7 +358,7 @@ const CourseDetails: React.FC = () => {
             </>
           ) : (
             <p className="text-gray-500 flex items-center justify-center h-full">
-              Sajnáljuk, de erről a kurzusról nem tudunk képet mutatni.
+              Sajnáljuk, de erről a kurzusól nem tudunk képet mutatni.
             </p>
           )}
         </div>
@@ -285,7 +373,7 @@ const CourseDetails: React.FC = () => {
           Hozd magaddal: kenyérsütő forma, kötény, jegyzetfüzet.
         </p>
       </div>
-      <div className="w-1/3 bg-white p-4 rounded-lg shadow-lg sticky top-4">
+      <div className="w-1/4 h-min bg-white p-4 rounded-lg shadow-lg top-4 max-h-auto">
         <h2 className="text-lg font-bold mb-2">Tanfolyam adatai</h2>
         <p className="text-gray-600 mb-2">
           Időpont:{" "}
@@ -317,20 +405,23 @@ const CourseDetails: React.FC = () => {
           </button>
         )}
         {isRegistered && (
-          <button
-            className="w-full bg-red-500 text-white px-4 py-2 rounded-md hover:bg-red-600 mb-2 disabled:opacity-50"
-            onClick={handleUnregister}
-            disabled={authLoading}
-          >
-            Jelentkezés visszavonása
-          </button>
+          <>
+            <button
+              className="w-full bg-red-500 text-white px-4 py-2 rounded-md hover:bg-red-600 mb-2 disabled:opacity-50"
+              onClick={handleUnregister}
+              disabled={authLoading}
+            >
+              Jelentkezés visszavonása
+            </button>
+            <button
+              className="w-full bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600 mb-2 disabled:opacity-50"
+              onClick={handlePayment}
+              disabled={paymentLoading || !user}
+            >
+              {paymentLoading ? "Fizetés folyamatban..." : "Fizetés"}
+            </button>
+          </>
         )}
-        <button
-          className="w-full bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600"
-          onClick={() => alert("Fizetési funkció később lesz implementálva!")}
-        >
-          Fizetés
-        </button>
         {isAdmin && course.registeredUsers.length > 0 && (
           <div className="mt-4">
             <h3 className="text-lg font-semibold mb-2">Jelentkezők</h3>
