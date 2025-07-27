@@ -25,26 +25,34 @@ export async function POST(request: NextRequest) {
 
     // Dynamically determine base URL
     const isLocalhost = process.env.NODE_ENV === "development";
-    let baseUrl = isLocalhost
-      ? "http://localhost:3000"
-      : process.env.NEXT_PUBLIC_BASE_URL || process.env.VERCEL_URL;
+    let baseUrl: string;
 
-    // Fallback to a known valid URL if undefined or empty
-    if (!baseUrl) {
-      console.warn("baseUrl is undefined or empty, using fallback URL");
-      baseUrl = "https://your-vercel-app.vercel.app"; // Replace with your actual Vercel URL
+    if (isLocalhost) {
+      baseUrl = "http://localhost:3000";
+    } else {
+      // Prioritize NEXT_PUBLIC_BASE_URL, then VERCEL_URL, then fallback
+      baseUrl = process.env.NEXT_PUBLIC_BASE_URL || process.env.VERCEL_URL || "";
+      if (!baseUrl) {
+        console.warn("Both NEXT_PUBLIC_BASE_URL and VERCEL_URL are undefined, using fallback URL");
+        baseUrl = "https://your-vercel-app.vercel.app"; // Replace with your actual Vercel URL
+      }
     }
+
+    console.log("Initial baseUrl:", baseUrl);
 
     // Ensure baseUrl has a protocol
-    if (typeof baseUrl === "string" && !baseUrl.startsWith("http")) {
+    if (baseUrl && !baseUrl.startsWith("http")) {
       console.log("Adding https protocol to baseUrl:", baseUrl);
       baseUrl = `https://${baseUrl}`;
-    } else if (typeof baseUrl !== "string") {
-      console.error("baseUrl is not a string:", baseUrl);
-      throw new Error("Invalid baseUrl: Must be a string");
     }
 
-    // Trim any trailing slashes
+    // Ensure baseUrl is not empty
+    if (!baseUrl) {
+      console.error("baseUrl is empty after checks");
+      throw new Error("baseUrl is empty or undefined");
+    }
+
+    // Trim trailing slashes
     baseUrl = baseUrl.replace(/\/+$/, "");
 
     // Validate baseUrl format
@@ -55,7 +63,7 @@ export async function POST(request: NextRequest) {
       throw new Error("Invalid baseUrl format: An explicit scheme (such as https) must be provided");
     }
 
-    console.log("Resolved baseUrl:", baseUrl);
+    console.log("Final resolved baseUrl:", baseUrl);
 
     const { courseId, courseTitle, coursePrice, userId, userEmail } = await request.json();
 
