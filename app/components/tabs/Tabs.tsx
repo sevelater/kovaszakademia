@@ -59,38 +59,45 @@ const Tabs: React.FC = () => {
   const router = useRouter();
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser: User | null) => {
-      setUser(currentUser);
-      if (currentUser) {
-        console.log("Bejelentkezett felhasználó UID:", currentUser.uid);
-        const userDocRef = doc(db, "users", currentUser.uid);
-        try {
-          const userDoc: DocumentSnapshot<DocumentData> = await getDoc(userDocRef);
-          if (userDoc.exists()) {
-            const userData = userDoc.data();
-            console.log("Felhasználó adatai:", userData);
-            setIsAdmin(userData?.isAdmin === true);
-          } else {
-            console.log("Nincs users dokumentum, létrehozzuk...");
-            await setDoc(userDocRef, { isAdmin: false });
+    const unsubscribe = onAuthStateChanged(
+      auth,
+      async (currentUser: User | null) => {
+        setUser(currentUser);
+        if (currentUser) {
+          console.log("Bejelentkezett felhasználó UID:", currentUser.uid);
+          const userDocRef = doc(db, "users", currentUser.uid);
+          try {
+            const userDoc: DocumentSnapshot<DocumentData> = await getDoc(
+              userDocRef
+            );
+            if (userDoc.exists()) {
+              const userData = userDoc.data();
+              console.log("Felhasználó adatai:", userData);
+              setIsAdmin(userData?.isAdmin === true);
+            } else {
+              console.log("Nincs users dokumentum, létrehozzuk...");
+              await setDoc(userDocRef, { isAdmin: false });
+              setIsAdmin(false);
+            }
+          } catch (error) {
+            console.error("Hiba a felhasználói adatok lekérése során:", error);
             setIsAdmin(false);
           }
-        } catch (error) {
-          console.error("Hiba a felhasználói adatok lekérése során:", error);
+        } else {
           setIsAdmin(false);
         }
-      } else {
-        setIsAdmin(false);
+        setLoading(false);
       }
-      setLoading(false);
-    });
+    );
     return () => unsubscribe();
   }, []);
 
   useEffect(() => {
     const fetchCourses = async () => {
       try {
-        const querySnapshot: QuerySnapshot<DocumentData> = await getDocs(collection(db, "courses"));
+        const querySnapshot: QuerySnapshot<DocumentData> = await getDocs(
+          collection(db, "courses")
+        );
         const coursesData: Course[] = querySnapshot.docs.map((doc) => {
           const data = doc.data();
           return {
@@ -111,7 +118,9 @@ const Tabs: React.FC = () => {
         console.log("Betöltött tanfolyamok:", coursesData);
         coursesData.sort((a, b) => {
           if (!a.datetime || !b.datetime) return 0;
-          return new Date(a.datetime).getTime() - new Date(b.datetime).getTime();
+          return (
+            new Date(a.datetime).getTime() - new Date(b.datetime).getTime()
+          );
         });
         setCourses(coursesData);
       } catch (error) {
@@ -124,6 +133,10 @@ const Tabs: React.FC = () => {
 
   const handleGoogleSignIn = async () => {
     const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({
+      prompt: "select_account",
+    });
+
     try {
       await signInWithPopup(auth, provider);
     } catch (error) {
@@ -168,7 +181,12 @@ const Tabs: React.FC = () => {
   return (
     <div className="p-6 flex gap-6">
       <div className="w-80 flex flex-col gap-4">
-        <CourseList courses={courses} isAdmin={isAdmin} setShowForm={setShowForm} setCourses={setCourses} />
+        <CourseList
+          courses={courses}
+          isAdmin={isAdmin}
+          setShowForm={setShowForm}
+          setCourses={setCourses}
+        />
         <CalendarView courses={courses} />
       </div>
       <div className="flex-1">
@@ -218,7 +236,11 @@ const Tabs: React.FC = () => {
         {showForm ? (
           <CourseForm
             mode={showForm === "new" ? "create" : "edit"}
-            course={showForm === "new" ? undefined : courses.find((c) => c.id === showForm)}
+            course={
+              showForm === "new"
+                ? undefined
+                : courses.find((c) => c.id === showForm)
+            }
             setCourses={setCourses}
             setShowForm={setShowForm}
             isAdmin={isAdmin}
@@ -226,7 +248,8 @@ const Tabs: React.FC = () => {
         ) : (
           <div className="bg-white p-4 shadow rounded-md min-h-[100px]">
             <h2 className="text-lg font-bold mb-2">{activeTab}</h2>
-            {courses.filter((course) => course.categories.includes(activeTab)).length === 0 ? (
+            {courses.filter((course) => course.categories.includes(activeTab))
+              .length === 0 ? (
               <p>Nincs tanfolyam ebben a kategóriában.</p>
             ) : (
               <ul className="space-y-2">
