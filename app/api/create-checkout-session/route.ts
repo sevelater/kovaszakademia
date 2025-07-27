@@ -30,11 +30,11 @@ export async function POST(request: NextRequest) {
     if (isLocalhost) {
       baseUrl = "http://localhost:3000";
     } else {
-      // Prioritize NEXT_PUBLIC_BASE_URL, then VERCEL_URL, then fallback
+      // Prioritize NEXT_PUBLIC_BASE_URL, then VERCEL_URL, then custom fallback
       baseUrl = process.env.NEXT_PUBLIC_BASE_URL || process.env.VERCEL_URL || "";
       if (!baseUrl) {
         console.warn("Both NEXT_PUBLIC_BASE_URL and VERCEL_URL are undefined, using fallback URL");
-        baseUrl = "https://your-vercel-app.vercel.app"; // Replace with your actual Vercel URL
+        baseUrl = "https://kovaszakademia.vercel.app"; // Replace with your actual Vercel URL
       }
     }
 
