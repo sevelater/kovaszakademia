@@ -16,13 +16,30 @@ export async function POST(request: NextRequest) {
       throw new Error("Stripe secret key is missing");
     }
 
+    // Dynamically determine base URL
     const isLocalhost = process.env.NODE_ENV === "development";
-    const baseUrl = isLocalhost
+    let baseUrl = isLocalhost
       ? "http://localhost:3000"
-      : process.env.NEXT_PUBLIC_BASE_URL || process.env.VERCEL_URL || "https://your-vercel-app.vercel.app";
+      : process.env.NEXT_PUBLIC_BASE_URL || process.env.VERCEL_URL;
+
+    // Ensure baseUrl has a protocol
+    if (baseUrl && !baseUrl.startsWith("http")) {
+      baseUrl = `https://${baseUrl}`;
+    }
+    // Fallback to a known valid URL if undefined
+    baseUrl = baseUrl || "https://your-vercel-app.vercel.app"; // Replace with your actual Vercel URL
+
+    console.log("Resolved baseUrl:", baseUrl);
 
     if (!baseUrl) {
       throw new Error("Base URL is missing");
+    }
+
+    // Validate baseUrl format
+    try {
+      new URL(baseUrl);
+    } catch (error) {
+      throw new Error("Invalid baseUrl format: An explicit scheme (such as https) must be provided");
     }
 
     const { courseId, courseTitle, coursePrice, userId, userEmail } = await request.json();
