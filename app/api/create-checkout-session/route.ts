@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 
-// Log environment variable availability at module level
+// Log environment variables at module level for debugging
+console.log("Environment variables at initialization:", {
+  STRIPE_SECRET_KEY: !!process.env.STRIPE_SECRET_KEY ? "defined" : "undefined",
+  NEXT_PUBLIC_BASE_URL: process.env.NEXT_PUBLIC_BASE_URL || "undefined",
+  VERCEL_URL: process.env.VERCEL_URL || "undefined",
+  NODE_ENV: process.env.NODE_ENV || "undefined",
+});
+
 if (!process.env.STRIPE_SECRET_KEY) {
   console.error("STRIPE_SECRET_KEY is not defined at module initialization");
 }
@@ -22,25 +29,33 @@ export async function POST(request: NextRequest) {
       ? "http://localhost:3000"
       : process.env.NEXT_PUBLIC_BASE_URL || process.env.VERCEL_URL;
 
-    // Ensure baseUrl has a protocol
-    if (baseUrl && !baseUrl.startsWith("http")) {
-      baseUrl = `https://${baseUrl}`;
-    }
-    // Fallback to a known valid URL if undefined
-    baseUrl = baseUrl || "https://your-vercel-app.vercel.app"; // Replace with your actual Vercel URL
-
-    console.log("Resolved baseUrl:", baseUrl);
-
+    // Fallback to a known valid URL if undefined or empty
     if (!baseUrl) {
-      throw new Error("Base URL is missing");
+      console.warn("baseUrl is undefined or empty, using fallback URL");
+      baseUrl = "https://your-vercel-app.vercel.app"; // Replace with your actual Vercel URL
     }
+
+    // Ensure baseUrl has a protocol
+    if (typeof baseUrl === "string" && !baseUrl.startsWith("http")) {
+      console.log("Adding https protocol to baseUrl:", baseUrl);
+      baseUrl = `https://${baseUrl}`;
+    } else if (typeof baseUrl !== "string") {
+      console.error("baseUrl is not a string:", baseUrl);
+      throw new Error("Invalid baseUrl: Must be a string");
+    }
+
+    // Trim any trailing slashes
+    baseUrl = baseUrl.replace(/\/+$/, "");
 
     // Validate baseUrl format
     try {
       new URL(baseUrl);
     } catch (error) {
+      console.error("Invalid baseUrl:", baseUrl, "Error:", error);
       throw new Error("Invalid baseUrl format: An explicit scheme (such as https) must be provided");
     }
+
+    console.log("Resolved baseUrl:", baseUrl);
 
     const { courseId, courseTitle, coursePrice, userId, userEmail } = await request.json();
 
