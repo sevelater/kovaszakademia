@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { db, auth } from "../../../firebase"; // Igazítsd a saját elérési utadhoz
+import { db, auth } from "../../../firebase";
 import {
   collection,
   getDocs,
@@ -45,8 +45,8 @@ export interface Course {
   categories: string[];
   datetime?: string;
   images?: string[];
-  maxCapacity: number; // Kötelező mező
-  registeredUsers: { uid: string; displayName: string }[]; // Kötelező, üres tömb alapértelmezetten
+  maxCapacity: number;
+  registeredUsers: { uid: string; displayName: string }[];
 }
 
 const Tabs: React.FC = () => {
@@ -67,9 +67,7 @@ const Tabs: React.FC = () => {
           console.log("Bejelentkezett felhasználó UID:", currentUser.uid);
           const userDocRef = doc(db, "users", currentUser.uid);
           try {
-            const userDoc: DocumentSnapshot<DocumentData> = await getDoc(
-              userDocRef
-            );
+            const userDoc: DocumentSnapshot<DocumentData> = await getDoc(userDocRef);
             if (userDoc.exists()) {
               const userData = userDoc.data();
               console.log("Felhasználó adatai:", userData);
@@ -95,9 +93,7 @@ const Tabs: React.FC = () => {
   useEffect(() => {
     const fetchCourses = async () => {
       try {
-        const querySnapshot: QuerySnapshot<DocumentData> = await getDocs(
-          collection(db, "courses")
-        );
+        const querySnapshot: QuerySnapshot<DocumentData> = await getDocs(collection(db, "courses"));
         const coursesData: Course[] = querySnapshot.docs.map((doc) => {
           const data = doc.data();
           return {
@@ -118,9 +114,7 @@ const Tabs: React.FC = () => {
         console.log("Betöltött tanfolyamok:", coursesData);
         coursesData.sort((a, b) => {
           if (!a.datetime || !b.datetime) return 0;
-          return (
-            new Date(a.datetime).getTime() - new Date(b.datetime).getTime()
-          );
+          return new Date(a.datetime).getTime() - new Date(b.datetime).getTime();
         });
         setCourses(coursesData);
       } catch (error) {
@@ -139,9 +133,14 @@ const Tabs: React.FC = () => {
 
     try {
       await signInWithPopup(auth, provider);
-    } catch (error) {
-      console.error("Hiba a Google bejelentkezés során:", error);
-      alert("Hiba történt a bejelentkezés közben.");
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        console.error("Hiba a Google bejelentkezés során:", error.message);
+        alert(`Hiba történt a bejelentkezés közben: ${error.message}`);
+      } else {
+        console.error("Ismeretlen hiba a Google bejelentkezés során:", error);
+        alert("Ismeretlen hiba történt a bejelentkezés közben.");
+      }
     }
   };
 
@@ -150,9 +149,14 @@ const Tabs: React.FC = () => {
       await signOut(auth);
       setUser(null);
       setIsAdmin(false);
-    } catch (error) {
-      console.error("Hiba a kijelentkezés során:", error);
-      alert("Hiba történt a kijelentkezés közben.");
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        console.error("Hiba a kijelentkezés során:", error.message);
+        alert(`Hiba történt a kijelentkezés közben: ${error.message}`);
+      } else {
+        console.error("Ismeretlen hiba a kijelentkezés során:", error);
+        alert("Ismeretlen hiba történt a kijelentkezés közben.");
+      }
     }
   };
 

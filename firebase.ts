@@ -1,10 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
-import { FirebaseError } from "firebase/app";
-import { ref } from "firebase/storage";
-import { updateDoc } from "firebase/firestore";
-import { arrayUnion } from "firebase/firestore";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAoOaTe-LmN91oF3YINYWfntXjy_xVMUS0",
@@ -22,6 +18,5 @@ const app = initializeApp(firebaseConfig);
 // Inicializálja a Firestore-t
 const db = getFirestore(app);
 const auth = getAuth(app);
-const error = FirebaseError;
 
-export { db, auth, error, ref, updateDoc, arrayUnion };
+export { db, auth };
