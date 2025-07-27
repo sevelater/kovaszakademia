@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 
+// Log environment variable availability at module level
+if (!process.env.STRIPE_SECRET_KEY) {
+  console.error("STRIPE_SECRET_KEY is not defined at module initialization");
+}
+
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2025-06-30.basil",
 });
@@ -44,8 +49,8 @@ export async function POST(request: NextRequest) {
         },
       ],
       mode: "payment",
-      success_url: `${baseUrl}/courses/${courseId}?payment=success`,
-      cancel_url: `${baseUrl}/courses/${courseId}?payment=canceled`,
+      success_url: `${baseUrl}/courses/tree/${courseId}?payment=success`,
+      cancel_url: `${baseUrl}/courses/tree/${courseId}?payment=canceled`,
       client_reference_id: userId,
       customer_email: userEmail,
       metadata: { courseId, userId },
