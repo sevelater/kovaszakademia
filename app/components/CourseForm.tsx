@@ -74,18 +74,7 @@ export default function CourseForm({
     maxCapacity: course?.maxCapacity?.toString() || "",
   });
 
-  const [img1, setImg1] = useState<File | undefined>(undefined);
-  const [img2, setImg2] = useState<File | undefined>(undefined);
-  const [img3, setImg3] = useState<File | undefined>(undefined);
-  const [imgPreview1, setImgPreview1] = useState<string>(
-    course?.images?.[0] || ""
-  );
-  const [imgPreview2, setImgPreview2] = useState<string>(
-    course?.images?.[1] || ""
-  );
-  const [imgPreview3, setImgPreview3] = useState<string>(
-    course?.images?.[2] || ""
-  );
+
   const [loading, setLoading] = useState<boolean>(false);
   const [progress, setProgress] = useState<string>("");
 
@@ -156,36 +145,6 @@ export default function CourseForm({
     try {
       const startTime = performance.now();
       const courseId = mode === "create" ? v4() : course!.id!;
-      const imageRefs = [
-        img1 ? ref(storage, `courses/${courseId}/${v4()}`) : null,
-        img2 ? ref(storage, `courses/${courseId}/${v4()}`) : null,
-        img3 ? ref(storage, `courses/${courseId}/${v4()}`) : null,
-      ];
-
-      let imgLinks: string[] = [];
-
-      // Képek feltöltése
-      if (img1 && imageRefs[0]) {
-        await uploadBytes(imageRefs[0], img1);
-        imgLinks.push(await getDownloadURL(imageRefs[0]));
-      } else {
-        imgLinks.push(course?.images?.[0] || "");
-      }
-      if (img2 && imageRefs[1]) {
-        await uploadBytes(imageRefs[1], img2);
-        imgLinks.push(await getDownloadURL(imageRefs[1]));
-      } else {
-        imgLinks.push(course?.images?.[1] || "");
-      }
-      if (img3 && imageRefs[2]) {
-        await uploadBytes(imageRefs[2], img3);
-        imgLinks.push(await getDownloadURL(imageRefs[2]));
-      } else {
-        imgLinks.push(course?.images?.[2] || "");
-      }
-
-      // Csak a létező képeket tartjuk meg
-      imgLinks = imgLinks.filter((url) => url !== "");
 
       const courseData = {
         title: form.title,
@@ -196,7 +155,6 @@ export default function CourseForm({
         description: form.description,
         categories: form.categories,
         datetime: form.datetime,
-        images: imgLinks,
         maxCapacity,
         registeredUsers: course?.registeredUsers || [],
       };
@@ -389,56 +347,6 @@ export default function CourseForm({
               ))}
             </select>
           </div>
-        </div>
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="flex flex-col">
-          <label className="font-semibold mb-1">1. Kép</label>
-          <input
-            type="file"
-            accept="image/*"
-            onChange={(e) => handleImageSelection(e, setImg1, setImgPreview1)}
-            className="p-2 border rounded-md"
-          />
-          {imgPreview1 && (
-            <img
-              src={imgPreview1}
-              alt="1. Kép előnézet"
-              className="mt-2 rounded-md h-auto w-full max-w-[200px]"
-            />
-          )}
-        </div>
-        <div className="flex flex-col">
-          <label className="font-semibold mb-1">2. Kép</label>
-          <input
-            type="file"
-            accept="image/*"
-            onChange={(e) => handleImageSelection(e, setImg2, setImgPreview2)}
-            className="p-2 border rounded-md"
-          />
-          {imgPreview2 && (
-            <img
-              src={imgPreview2}
-              alt="2. Kép előnézet"
-              className="mt-2 rounded-md h-auto w-full max-w-[200px]"
-            />
-          )}
-        </div>
-        <div className="flex flex-col">
-          <label className="font-semibold mb-1">3. Kép</label>
-          <input
-            type="file"
-            accept="image/*"
-            onChange={(e) => handleImageSelection(e, setImg3, setImgPreview3)}
-            className="p-2 border rounded-md"
-          />
-          {imgPreview3 && (
-            <img
-              src={imgPreview3}
-              alt="3. Kép előnézet"
-              className="mt-2 rounded-md h-auto w-full max-w-[200px]"
-            />
-          )}
         </div>
       </div>
       <div>
