@@ -2,6 +2,7 @@
 
 import React from "react";
 import CourseCard from "./CourseCard";
+import { User } from "firebase/auth";
 
 interface Course {
   id?: string;
@@ -14,8 +15,8 @@ interface Course {
   categories: string[];
   datetime?: string;
   images?: string[];
-  maxCapacity: number; // Kötelező mező
-  registeredUsers: { uid: string; displayName: string }[]; // Kötelező mező
+  maxCapacity: number;
+  registeredUsers: { uid: string; displayName: string }[];
 }
 
 interface Props {
@@ -23,9 +24,11 @@ interface Props {
   isAdmin: boolean;
   setShowForm: (form: string) => void;
   setCourses: React.Dispatch<React.SetStateAction<Course[]>>;
+  user: User | null;
+  setShowLoginModal: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
-const CourseList: React.FC<Props> = ({ courses, isAdmin, setShowForm, setCourses }) => {
+const CourseList: React.FC<Props> = ({ courses, isAdmin, setShowForm, setCourses, user, setShowLoginModal }) => {
   return (
     <div className="w-80 bg-white p-4 rounded-lg shadow-lg max-h-[calc(100vh-400px)] overflow-y-auto">
       <h3 className="text-lg font-bold mb-2">Összes tanfolyam</h3>
@@ -40,7 +43,9 @@ const CourseList: React.FC<Props> = ({ courses, isAdmin, setShowForm, setCourses
               isAdmin={isAdmin}
               setCourses={setCourses}
               setShowForm={setShowForm}
-              hideAdminActions={true} // Admin gombok elrejtése
+              hideAdminActions={true}
+              user={user}
+              setShowLoginModal={setShowLoginModal}
             />
           ))}
         </ul>

@@ -7,7 +7,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="hu">
-      <body>{children}</body>
+      <body className="cursor-custom">{children}</body>
     </html>
   );
 }

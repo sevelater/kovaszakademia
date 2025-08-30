@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import Calendar from "react-calendar";
 import "react-calendar/dist/Calendar.css";
 import CourseCard from "./CourseCard";
+import { User } from "firebase/auth";
 
 interface Course {
   id?: string;
@@ -16,15 +17,17 @@ interface Course {
   categories: string[];
   datetime?: string;
   images?: string[];
-  maxCapacity: number; // Kötelező mező
-  registeredUsers: { uid: string; displayName: string }[]; // Kötelező mező
+  maxCapacity: number;
+  registeredUsers: { uid: string; displayName: string }[];
 }
 
 type Props = {
   courses: Course[];
+  user: User | null;
+  setShowLoginModal: React.Dispatch<React.SetStateAction<boolean>>;
 };
 
-export default function CalendarView({ courses }: Props) {
+export default function CalendarView({ courses, user, setShowLoginModal }: Props) {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedCourses, setSelectedCourses] = useState<Course[]>([]);
 
@@ -120,6 +123,8 @@ export default function CalendarView({ courses }: Props) {
                   setCourses={() => {}}
                   setShowForm={() => {}}
                   hideAdminActions={true}
+                  user={user}
+                  setShowLoginModal={setShowLoginModal}
                 />
               ))}
               {selectedCourses.length > 2 && (

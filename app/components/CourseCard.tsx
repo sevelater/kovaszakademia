@@ -2,8 +2,9 @@
 
 import React from "react";
 import { useRouter } from "next/navigation";
-import { db } from "../../firebase"; // Igazítsd a saját elérési utadhoz
+import { db } from "../../firebase";
 import { deleteDoc, doc } from "firebase/firestore";
+import { User } from "firebase/auth";
 
 interface Course {
   id?: string;
@@ -16,8 +17,8 @@ interface Course {
   categories: string[];
   datetime?: string;
   images?: string[];
-  maxCapacity: number; // Kötelező mező
-  registeredUsers: { uid: string; displayName: string }[]; // Kötelező mező
+  maxCapacity: number;
+  registeredUsers: { uid: string; displayName: string }[];
 }
 
 interface Props {
@@ -25,10 +26,20 @@ interface Props {
   isAdmin: boolean;
   setCourses: React.Dispatch<React.SetStateAction<Course[]>>;
   setShowForm: (form: string) => void;
+  setShowLoginModal?: React.Dispatch<React.SetStateAction<boolean>>; // Opcionális
+  user?: User | null; // Opcionális
   hideAdminActions?: boolean;
 }
 
-const CourseCard: React.FC<Props> = ({ course, isAdmin, setCourses, setShowForm, hideAdminActions }) => {
+const CourseCard: React.FC<Props> = ({
+  course,
+  isAdmin,
+  setCourses,
+  setShowForm,
+  setShowLoginModal,
+  user,
+  hideAdminActions,
+}) => {
   const router = useRouter();
 
   const handleDelete = async () => {
@@ -52,7 +63,9 @@ const CourseCard: React.FC<Props> = ({ course, isAdmin, setCourses, setShowForm,
   };
 
   const handleNavigation = () => {
-    if (course.id) {
+    if (setShowLoginModal && !user) {
+      setShowLoginModal(true);
+    } else if (course.id) {
       console.log(`Navigálás ide: /courses/${course.id}`);
       router.push(`/courses/${course.id}`);
     } else {
