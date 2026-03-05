@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 
 // Log environment variables at module level for debugging
@@ -89,8 +89,8 @@ export async function POST(request: NextRequest) {
         },
       ],
       mode: "payment",
-      success_url: `${baseUrl}/courses/tree/${courseId}?payment=success`,
-      cancel_url: `${baseUrl}/courses/tree/${courseId}?payment=canceled`,
+      success_url: `${baseUrl}/courses/${courseId}?payment=success`,
+      cancel_url: `${baseUrl}/courses/${courseId}?payment=canceled`,
       client_reference_id: userId,
       customer_email: userEmail,
       metadata: { courseId, userId },

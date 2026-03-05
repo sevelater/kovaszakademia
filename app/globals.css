@@ -1,9 +1,18 @@
+@import url('https://fonts.googleapis.com/css2?family=Nunito:ital,wght@0,200..1000;1,200..1000&family=Quicksand:wght@300..700&display=swap');
 @import "tailwindcss";
 
 :root {
-  --first: #a7c3e8;
+  --first: #efeacb;
   --second: #fffcff;
-  --third: #685b53;
+  --third: #15421a;
+  --fourth: #ab7c62;
+  --fifth: #eaa45f;
+}
+
+* {
+  font-family: "Nunito", sans-serif;
+  font-weight: 500;
+  font-size: medium;
 }
 
 .react-calendar {

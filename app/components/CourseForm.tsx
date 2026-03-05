@@ -9,7 +9,7 @@ import { v4 } from "uuid";
 const categories = [
   "Pékeknek és pékségeknek",
   "Otthon sütőknek",
-  "Moduláris képzésünk",
+  "Moduláris képzéseink",
   "Mesterkurzusok",
   "Üzleti tanácsadás pékségeknek",
   "Oktatói franchise",
@@ -130,17 +130,17 @@ export default function CourseForm({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!isAdmin) {
-      alert("Nincs jogosultságod tanfolyamot menteni!");
+      alert("Nincs jogosultsÄ‚Ë‡god tanfolyamot menteni!");
       return;
     }
     const maxCapacity = parseInt(form.maxCapacity);
     if (isNaN(maxCapacity) || maxCapacity < 1) {
-      alert("A maximális létszám legalább 1 kell legyen!");
+      alert("A maximÄ‚Ë‡lis lÄ‚Â©tszÄ‚Ë‡m legalÄ‚Ë‡bb 1 kell legyen!");
       return;
     }
 
     setLoading(true);
-    setProgress("Képek feltöltése és tanfolyam mentése...");
+    setProgress("KÄ‚Â©pek feltÄ‚Â¶ltÄ‚Â©se Ä‚Â©s tanfolyam mentÄ‚Â©se...");
 
     try {
       const startTime = performance.now();
@@ -156,7 +156,7 @@ export default function CourseForm({
         categories: form.categories,
         datetime: form.datetime,
         maxCapacity,
-        registeredUsers: course?.registeredUsers || [],
+        registeredUsers: mode === "edit" ? course?.registeredUsers || [] : [],
       };
 
       if (courseData.datetime && !isNaN(new Date(courseData.datetime).getTime())) {
@@ -204,10 +204,10 @@ export default function CourseForm({
         console.log(`Total submit time: ${duration} seconds`);
         setShowForm("");
         alert(
-          `Tanfolyam sikeresen ${mode === "create" ? "létrehozva" : "szerkesztve"}!`
+          `Tanfolyam sikeresen ${mode === "create" ? "Létrehozva" : "szerkesztve"}!`
         );
       } else {
-        alert("Érvénytelen időpont formátum! Kérlek, adj meg érvényes időpontot.");
+        alert("Érvénytelen időpont formátum! Kérlek adj meg érvényes időpontot.");
       }
     } catch (error: unknown) {
       console.error("Hiba a tanfolyam mentése során:", error);
@@ -241,7 +241,7 @@ export default function CourseForm({
         <input
           type="number"
           name="price"
-          placeholder="Ár (Ft) /fő"
+          placeholder="Ár (Ft) /fÄąâ€"
           value={form.price}
           onChange={handleFormChange}
           required

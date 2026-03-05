@@ -23,17 +23,27 @@ interface Course {
 
 type Props = {
   courses: Course[];
+  isAdmin: boolean;
   user: User | null;
   setShowLoginModal: React.Dispatch<React.SetStateAction<boolean>>;
 };
 
-export default function CalendarView({ courses, user, setShowLoginModal }: Props) {
+const isExpiredCourse = (course: Course): boolean => {
+  if (!course.datetime) return false;
+  const courseDate = new Date(course.datetime);
+  if (Number.isNaN(courseDate.getTime())) return false;
+  return courseDate.getTime() < Date.now();
+};
+
+export default function CalendarView({ courses, isAdmin, user, setShowLoginModal }: Props) {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedCourses, setSelectedCourses] = useState<Course[]>([]);
 
+  const visibleCourses = isAdmin ? courses : courses.filter((course) => !isExpiredCourse(course));
+
   const tileContent = ({ date, view }: { date: Date; view: string }) => {
     if (view === "month") {
-      const courseDates = courses.filter((course) => {
+      const courseDates = visibleCourses.filter((course) => {
         if (!course.datetime) return false;
         const courseDate = new Date(course.datetime);
         return (
@@ -42,6 +52,7 @@ export default function CalendarView({ courses, user, setShowLoginModal }: Props
           courseDate.getDate() === date.getDate()
         );
       });
+
       if (courseDates.length > 0) {
         return (
           <div className="relative">
@@ -65,12 +76,13 @@ export default function CalendarView({ courses, user, setShowLoginModal }: Props
         );
       }
     }
+
     return null;
   };
 
   const handleDayClick = (date: Date) => {
     setSelectedDate(date);
-    const filteredCourses = courses.filter((course) => {
+    const filteredCourses = visibleCourses.filter((course) => {
       if (!course.datetime) return false;
       const courseDate = new Date(course.datetime);
       return (
@@ -92,7 +104,7 @@ export default function CalendarView({ courses, user, setShowLoginModal }: Props
         locale="hu-HU"
         tileClassName={({ date, view }) => {
           if (view === "month") {
-            const hasCourse = courses.some((course) => {
+            const hasCourse = visibleCourses.some((course) => {
               if (!course.datetime) return false;
               const courseDate = new Date(course.datetime);
               return (
