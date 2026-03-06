@@ -1,10 +1,8 @@
 "use client";
 
 import React, { useState } from "react";
-import { db, storage } from "../../firebase";
+import { db } from "../../firebase";
 import { addDoc, collection, setDoc, doc } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { v4 } from "uuid";
 
 const categories = [
   "Pékeknek és pékségeknek",
@@ -36,6 +34,8 @@ type Props = {
   setCourses: React.Dispatch<React.SetStateAction<Course[]>>;
   setShowForm: (form: string) => void;
   isAdmin: boolean;
+  instructorOptions?: string[];
+  locationOptions?: string[];
 };
 
 export default function CourseForm({
@@ -44,16 +44,18 @@ export default function CourseForm({
   setCourses,
   setShowForm,
   isAdmin,
+  instructorOptions = [],
+  locationOptions = [],
 }: Props) {
   const years = Array.from({ length: 6 }, (_, i) => 2025 + i);
   const months = Array.from({ length: 12 }, (_, i) =>
-    String(i + 1).padStart(2, "0")
+    String(i + 1).padStart(2, "0"),
   );
   const days = Array.from({ length: 31 }, (_, i) =>
-    String(i + 1).padStart(2, "0")
+    String(i + 1).padStart(2, "0"),
   );
   const hours = Array.from({ length: 24 }, (_, i) =>
-    String(i).padStart(2, "0")
+    String(i).padStart(2, "0"),
   );
   const minutes = ["00", "15", "30", "45"];
 
@@ -74,7 +76,6 @@ export default function CourseForm({
     maxCapacity: course?.maxCapacity?.toString() || "",
   });
 
-
   const [loading, setLoading] = useState<boolean>(false);
   const [progress, setProgress] = useState<string>("");
 
@@ -90,7 +91,7 @@ export default function CourseForm({
   const handleFormChange = (
     e: React.ChangeEvent<
       HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
-    >
+    >,
   ) => {
     const { name, value } = e.target;
     setForm((prev) => {
@@ -107,45 +108,22 @@ export default function CourseForm({
     });
   };
 
-  const handleImageSelection = (
-    e: React.ChangeEvent<HTMLInputElement>,
-    setImage: React.Dispatch<React.SetStateAction<File | undefined>>,
-    setPreview: React.Dispatch<React.SetStateAction<string>>
-  ) => {
-    const file = e.target.files?.[0];
-    setImage(file);
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (e: ProgressEvent<FileReader>) => {
-        if (e.target?.result) {
-          setPreview(e.target.result as string);
-        }
-      };
-      reader.readAsDataURL(file);
-    } else {
-      setPreview("");
-    }
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!isAdmin) {
-      alert("Nincs jogosultsÄ‚Ë‡god tanfolyamot menteni!");
+      alert("Nincs jogosultságod tanfolyamot menteni!");
       return;
     }
     const maxCapacity = parseInt(form.maxCapacity);
     if (isNaN(maxCapacity) || maxCapacity < 1) {
-      alert("A maximÄ‚Ë‡lis lÄ‚Â©tszÄ‚Ë‡m legalÄ‚Ë‡bb 1 kell legyen!");
+      alert("A maximális létszám legalább 1 kell legyen!");
       return;
     }
 
     setLoading(true);
-    setProgress("KÄ‚Â©pek feltÄ‚Â¶ltÄ‚Â©se Ä‚Â©s tanfolyam mentÄ‚Â©se...");
+    setProgress("Képek feltöltése és tanfolyam mentése...");
 
     try {
-      const startTime = performance.now();
-      const courseId = mode === "create" ? v4() : course!.id!;
-
       const courseData = {
         title: form.title,
         price: parseInt(form.price),
@@ -159,13 +137,16 @@ export default function CourseForm({
         registeredUsers: mode === "edit" ? course?.registeredUsers || [] : [],
       };
 
-      if (courseData.datetime && !isNaN(new Date(courseData.datetime).getTime())) {
-        console.log("Starting Firestore write...");
+      if (
+        courseData.datetime &&
+        !isNaN(new Date(courseData.datetime).getTime())
+      ) {
         const firestoreTimeout = new Promise<never>((_, reject) =>
           setTimeout(
-            () => reject(new Error("Firestore write timed out after 10 seconds")),
-            10000
-          )
+            () =>
+              reject(new Error("Firestore write timed out after 10 seconds")),
+            10000,
+          ),
         );
 
         if (mode === "create") {
@@ -179,7 +160,7 @@ export default function CourseForm({
               return (
                 new Date(a.datetime).getTime() - new Date(b.datetime).getTime()
               );
-            })
+            }),
           );
         } else {
           await Promise.race([
@@ -189,29 +170,31 @@ export default function CourseForm({
           setCourses((prev) =>
             prev
               .map((c) =>
-                c.id === course!.id ? { ...courseData, id: course!.id } : c
+                c.id === course!.id ? { ...courseData, id: course!.id } : c,
               )
               .sort((a, b) => {
                 if (!a.datetime || !b.datetime) return 0;
                 return (
-                  new Date(a.datetime).getTime() - new Date(b.datetime).getTime()
+                  new Date(a.datetime).getTime() -
+                  new Date(b.datetime).getTime()
                 );
-              })
+              }),
           );
         }
-        const duration = (performance.now() - startTime) / 1000;
-        console.log(`Firestore write completed in ${duration} seconds`);
-        console.log(`Total submit time: ${duration} seconds`);
+
         setShowForm("");
         alert(
-          `Tanfolyam sikeresen ${mode === "create" ? "Létrehozva" : "szerkesztve"}!`
+          `Tanfolyam sikeresen ${mode === "create" ? "Létrehozva" : "szerkesztve"}!`,
         );
       } else {
-        alert("Érvénytelen időpont formátum! Kérlek adj meg érvényes időpontot.");
+        alert(
+          "Érvénytelen időpont formátum! Kérlek adj meg érvényes időpontot.",
+        );
       }
     } catch (error: unknown) {
       console.error("Hiba a tanfolyam mentése során:", error);
-      const errorMessage = error instanceof Error ? error.message : "Ismeretlen hiba";
+      const errorMessage =
+        error instanceof Error ? error.message : "Ismeretlen hiba";
       alert(`Hiba történt: ${errorMessage}`);
     } finally {
       setLoading(false);
@@ -219,13 +202,17 @@ export default function CourseForm({
     }
   };
 
+  if (!isAdmin) return null;
+
   return (
     <form
       onSubmit={handleSubmit}
-      className="bg-white p-6 rounded-md shadow space-y-4 max-w-5xl"
+      className="rounded-md max-w-5xl bg-white/80 text-gray-700 backdrop-blur-md p-6 space-y-5 shadow-xl w-full border border-white/20"
     >
       <h2 className="text-xl font-bold">
-        {mode === "create" ? "Új tanfolyam létrehozása" : "Tanfolyam szerkesztése"}
+        {mode === "create"
+          ? "Új tanfolyam létrehozása"
+          : "Tanfolyam szerkesztése"}
       </h2>
       {progress && <div className="text-center text-gray-600">{progress}</div>}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -241,7 +228,7 @@ export default function CourseForm({
         <input
           type="number"
           name="price"
-          placeholder="Ár (Ft) /fÄąâ€"
+          placeholder="Ár (Ft) /fő"
           value={form.price}
           onChange={handleFormChange}
           required
@@ -257,22 +244,58 @@ export default function CourseForm({
           min="1"
           className="p-2 border rounded-md"
         />
-        <input
-          type="text"
-          name="instructor"
-          placeholder="Oktató neve"
-          value={form.instructor}
-          onChange={handleFormChange}
-          className="p-2 border rounded-md"
-        />
-        <input
-          type="text"
-          name="location"
-          placeholder="Helyszín"
-          value={form.location}
-          onChange={handleFormChange}
-          className="p-2 border rounded-md"
-        />
+        <div className="space-y-2">
+          <input
+            type="text"
+            name="instructor"
+            placeholder="Oktató neve"
+            value={form.instructor}
+            onChange={handleFormChange}
+            className="w-full p-2 border rounded-md"
+          />
+          {instructorOptions.length > 0 && (
+            <select
+              value=""
+              onChange={(event) =>
+                setForm((prev) => ({ ...prev, instructor: event.target.value }))
+              }
+              className="w-full p-2 border rounded-md"
+            >
+              <option value="">Válassz mentett oktatót</option>
+              {instructorOptions.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
+        <div className="space-y-2">
+          <input
+            type="text"
+            name="location"
+            placeholder="Helyszín"
+            value={form.location}
+            onChange={handleFormChange}
+            className="w-full p-2 border rounded-md"
+          />
+          {locationOptions.length > 0 && (
+            <select
+              value=""
+              onChange={(event) =>
+                setForm((prev) => ({ ...prev, location: event.target.value }))
+              }
+              className="w-full p-2 border rounded-md"
+            >
+              <option value="">Válassz mentett helyszínt</option>
+              {locationOptions.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
         <div className="col-span-2">
           <label className="font-semibold block mb-1">Időpont</label>
           <div className="flex gap-2">
@@ -280,7 +303,7 @@ export default function CourseForm({
               name="year"
               value={form.year}
               onChange={handleFormChange}
-              className="p-2 border rounded-md"
+              className="p-2 rounded-md bg-white/30 text-gray-700 cursor-pointer shadow-md"
               required
             >
               <option value="">Év</option>
@@ -294,7 +317,7 @@ export default function CourseForm({
               name="month"
               value={form.month}
               onChange={handleFormChange}
-              className="p-2 border rounded-md"
+              className="p-2 rounded-md bg-white/30 text-gray-700 cursor-pointer shadow-md"
               required
             >
               <option value="">Hónap</option>
@@ -308,7 +331,7 @@ export default function CourseForm({
               name="day"
               value={form.day}
               onChange={handleFormChange}
-              className="p-2 border rounded-md"
+              className="p-2 rounded-md bg-white/30 text-gray-700 cursor-pointer shadow-md"
               required
             >
               <option value="">Nap</option>
@@ -322,7 +345,7 @@ export default function CourseForm({
               name="hour"
               value={form.hour}
               onChange={handleFormChange}
-              className="p-2 border rounded-md"
+              className="p-2 rounded-md bg-white/30 text-gray-700 cursor-pointer shadow-md"
               required
             >
               <option value="">Óra</option>
@@ -336,7 +359,7 @@ export default function CourseForm({
               name="minute"
               value={form.minute}
               onChange={handleFormChange}
-              className="p-2 border rounded-md"
+              className="p-2 rounded-md bg-white/30 text-gray-700 cursor-pointer shadow-md"
               required
             >
               <option value="">Perc</option>
@@ -357,10 +380,10 @@ export default function CourseForm({
               type="button"
               key={cat}
               onClick={() => handleCategoryToggle(cat)}
-              className={`px-3 py-1 rounded-md border cursor-pointer ${
+              className={`px-3 py-1 rounded-md cursor-pointer ${
                 form.categories.includes(cat)
-                  ? "bg-[var(--first)] hover:bg-[var(--first)] transition-all duration-200 text-white"
-                  : "bg-gray-100 text-gray-800"
+                  ? "bg-(--fifth) text-(--second)"
+                  : "bg-white/30 text-gray-700 hover:bg-white"
               }`}
             >
               {cat}
@@ -387,7 +410,7 @@ export default function CourseForm({
       <div className="text-right">
         <button
           type="submit"
-          className="bg-[var(--first)] transition-all duration-200 text-[var(--second)] px-6 py-2 rounded-md hover:bg-[var(--first)]/80 hover:cursor-pointer"
+          className="bg-[#6e856b] transition-all duration-200 text-(--second) px-6 py-2 rounded-md hover:bg-(--third)/80 hover:cursor-pointer"
           disabled={loading}
         >
           {loading ? "Mentés folyamatban..." : "Mentés"}

@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import Calendar from "react-calendar";
 import "react-calendar/dist/Calendar.css";
-import CourseCard from "./CourseCard";
+import CourseCard from "./ExpiredCourse";
 import { User } from "firebase/auth";
 
 interface Course {
@@ -113,7 +113,7 @@ export default function CalendarView({ courses, isAdmin, user, setShowLoginModal
                 courseDate.getDate() === date.getDate()
               );
             });
-            return hasCourse ? "bg-blue-100 rounded-full" : null;
+            return hasCourse ? "bg-black" : null;
           }
           return null;
         }}

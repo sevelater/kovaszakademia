@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import CourseCard from "./CourseCard";
+import CourseCard from "./ExpiredCourse";
 import { User } from "firebase/auth";
 
 interface Course {

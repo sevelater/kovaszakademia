@@ -20,16 +20,29 @@
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
   background-color: #f9fafb;
 }
+
 .react-calendar__tile--active {
-  background: #ebac25 !important;
+  background: var(--fifth) !important;
   color: white !important;
 }
+
 .react-calendar__tile--hasActive {
   background: #dbeafe !important;
 }
 
+.react-calendar button {
+  box-shadow: none !important;
+}
+
+.react-calendar__tile--now {
+  background: #ab7c62;
+  color: black;
+}
+
 button {
   cursor: pointer;
+  transition: all 0.2s ease-in-out;
+  @apply shadow-md transition active:scale-[0.90] active:shadow-sm;
 }
 
 /* Animációk */

@@ -119,19 +119,19 @@ const CourseDetails: React.FC = () => {
 
   const registerUser = async () => {
     if (authLoading) {
-      alert("Kerlek varj, a hitelesitesi allapot meg betoltes alatt!");
+      alert("Kérlek várj, a hitelesytési állapot még betöltés alatt!");
       return false;
     }
     if (!user || !user.uid) {
-      alert("Bejelentkezes szukseges a jelentkezeshez!");
+      alert("Bejelentkezés szükséges a jelentkezéshez!");
       return false;
     }
     if (!course?.id) {
-      alert("Ervenytelen kurzus!");
+      alert("Érvenytelen kurzus!");
       return false;
     }
     if (isExpiredCourse(course)) {
-      alert("Erre a Lejárt kurzusra mar nem lehet jelentkezni.");
+      alert("Erre a lejárt kurzusra már nem lehet jelentkezni.");
       return false;
     }
     if (course.registeredUsers.length >= course.maxCapacity) {
@@ -143,7 +143,7 @@ const CourseDetails: React.FC = () => {
       const courseRef = doc(db, "courses", course.id);
       const courseSnap = await getDoc(courseRef);
       if (!courseSnap.exists()) {
-        alert("A kurzus nem letezik!");
+        alert("A kurzus nem létezik!");
         return false;
       }
 
@@ -153,14 +153,14 @@ const CourseDetails: React.FC = () => {
           (u: { uid: string; displayName: string }) => u.uid === user.uid,
         )
       ) {
-        alert("Mar jelentkeztel erre a kurzusra!");
+        alert("MÁr jelentkeztel erre a kurzusra!");
         return false;
       }
 
       await updateDoc(courseRef, {
         registeredUsers: arrayUnion({
           uid: user.uid,
-          displayName: user.displayName || "Nevtelen",
+          displayName: user.displayName || "Névtelen",
         }),
       });
 
@@ -170,30 +170,30 @@ const CourseDetails: React.FC = () => {
               ...prev,
               registeredUsers: [
                 ...prev.registeredUsers,
-                { uid: user.uid, displayName: user.displayName || "Nevtelen" },
+                { uid: user.uid, displayName: user.displayName || "Névtelen" },
               ],
             }
           : prev,
       );
       setIsRegistered(true);
-      alert("Sikeres jelentkezes!");
+      // alert("Sikeres jelentkezes!");
       return true;
     } catch (error: unknown) {
-      console.error("Hiba a jelentkezes soran:", error);
+      console.error("Hiba a jelentkezés során:", error);
       const errorMessage =
         error instanceof Error ? error.message : "Ismeretlen hiba";
-      alert(`Hiba tortent a jelentkezes kozben: ${errorMessage}`);
+      alert(`Hiba történt a jelentkezés közben: ${errorMessage}`);
       return false;
     }
   };
 
   const handleUnregister = async () => {
     if (authLoading) {
-      alert("Kerlek varj, a hitelesitesi allapot meg betoltes alatt!");
+      alert("Kérlek várj, a hitelesitesi állapot meg betöltes alatt!");
       return;
     }
     if (!user || !user.uid || !course?.id) {
-      alert("Ervenytelen kurzus vagy felhasznalo!");
+      alert("Érvenytelen kurzus vagy felhasználó!");
       return;
     }
 
@@ -201,7 +201,7 @@ const CourseDetails: React.FC = () => {
       const courseRef = doc(db, "courses", course.id);
       const courseSnap = await getDoc(courseRef);
       if (!courseSnap.exists()) {
-        alert("A kurzus nem letezik!");
+        alert("A kurzus nem létezik!");
         return;
       }
 
@@ -215,7 +215,7 @@ const CourseDetails: React.FC = () => {
         await updateDoc(courseRef, {
           registeredUsers: arrayRemove({
             uid: user.uid,
-            displayName: user.displayName || "Nevtelen",
+            displayName: user.displayName || "Névtelen",
           }),
         });
 
@@ -230,29 +230,29 @@ const CourseDetails: React.FC = () => {
             : prev,
         );
         setIsRegistered(false);
-        alert("Jelentkezes sikeresen visszavonva!");
+        alert("Jelentkezés sikeresen visszavonva!");
       } else {
         alert("Nem vagy jelentkezve erre a kurzusra!");
       }
     } catch (error: unknown) {
-      console.error("Hiba a jelentkezes visszavonasa soran:", error);
+      console.error("Hiba a jelentkezés visszavonása során:", error);
       const errorMessage =
         error instanceof Error ? error.message : "Ismeretlen hiba";
-      alert(`Hiba tortent a jelentkezes visszavonasa kozben: ${errorMessage}`);
+      alert(`Hiba történt a jelentkezés visszavonása közben: ${errorMessage}`);
     }
   };
 
   const handlePayment = async () => {
     if (!user || !user.uid || !user.email) {
-      alert("Bejelentkezes szukseges, es az email cim nem lehet ures!");
+      alert("Bejelentkezés szükséges, és az email cím nem lehet üres!");
       return;
     }
     if (!course || !course.id || !course.title || !course.price) {
-      alert("Ervenytelen kurzus adatok!");
+      alert("Érvénytelen kurzus adatok!");
       return;
     }
     if (isExpiredCourse(course)) {
-      alert("Lejárt kurzusra nem lehet fizetni.");
+      alert("Lejárt kurzusra nem lehet befizetni.");
       return;
     }
 
@@ -345,17 +345,16 @@ const CourseDetails: React.FC = () => {
   const isExpired = isExpiredCourse(course);
 
   return (
-    <div className="p-6 flex gap-6 bg-[var(--first)] min-h-screen">
-      <Link
-        href="/"
-        prefetch
-        className="text-[var(--second)] font-medium tracking-wider p-1.5 rounded-md bg-[var(--third)] h-min"
+    <div className="p-6 flex gap-6 bg-(--first) min-h-screen">
+      <button
+        onClick={() => router.push("/")}
+        className="text-(--second) font-medium tracking-wider p-1.5 rounded-md backdrop-blur-3xl bg-(--fifth) h-min duration-200 ease-in-out hover:bg-(--fifth)/50"
       >
         Piactér
-      </Link>
+      </button>
 
       <div className="relative w-3/4 max-w-5xl">
-        <div className="relative bg-[var(--fourth)] h-1/2 rounded-md mb-4 overflow-hidden">
+        <div className="relative bg-(--fourth) h-1/2 rounded-md mb-4 overflow-hidden">
           {imgs.length > 0 ? (
             <>
               <img
@@ -443,7 +442,7 @@ const CourseDetails: React.FC = () => {
               ? "Lejárt kurzus"
               : isFull
                 ? "Betelt!"
-                : `Mar csak ${remainingSpots} hely van!`}
+                : `Már csak ${remainingSpots} hely van!`}
           </p>
 
           {!isExpired && !isFull && !isRegistered && (

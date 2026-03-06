@@ -66,14 +66,14 @@ const CourseCard: React.FC<Props> = ({
       if (course.id) {
         await deleteDoc(doc(db, "courses", course.id));
         setCourses((prev) => prev.filter((c) => c.id !== course.id));
-        alert("Tanfolyam sikeresen torolve!");
+        alert("Tanfolyam sikeresen törölve!");
       } else {
         console.error("A tanfolyam ID-ja hianyzik!");
         alert("Hiba: A tanfolyam ID-ja hianyzik!");
       }
     } catch (error) {
-      console.error("Hiba a tanfolyam torlese soran:", error);
-      alert("Hiba tortent a tanfolyam torlese kozben.");
+      console.error("Hiba a tanfolyam törlése során:", error);
+      alert("Hiba törtent a tanfolyam törlése közben.");
     }
   };
 
@@ -88,8 +88,8 @@ const CourseCard: React.FC<Props> = ({
     } else if (course.id) {
       router.push(`/courses/${course.id}`);
     } else {
-      console.error("A tanfolyam ID-ja hianyzik a navigaciohoz!");
-      alert("Hiba: Nem lehet navigalni, mert a tanfolyam ID-ja hianyzik!");
+      console.error("A tanfolyam ID-ja hiaáyzik a navigációhoz!");
+      alert("Hiba: Nem lehet navigálni, mert a tanfolyam ID-ja hiányzik!");
     }
   };
 
@@ -119,19 +119,23 @@ const CourseCard: React.FC<Props> = ({
               setShowRegistrantInfo((prev) => !prev);
             }}
             className="w-6 h-6 rounded-full border-2 border-blue-500 text-blue-600 text-xs font-bold bg-white hover:bg-blue-50"
-            title="Jelentkezok"
+            title="Jelentkezők"
           >
             i
           </button>
           {showRegistrantInfo && (
             <div className="absolute right-0 mt-2 w-56 bg-white border border-blue-100 rounded-md shadow-lg p-2 z-20">
-              <p className="text-xs font-semibold text-blue-700 mb-1">Jelentkezők</p>
+              <p className="text-xs font-semibold text-blue-700 mb-1">
+                Jelentkezők
+              </p>
               {course.registeredUsers.length === 0 ? (
                 <p className="text-xs text-gray-600">Nincs jelentkező.</p>
               ) : (
                 <ul className="text-xs text-gray-700 space-y-1 max-h-28 overflow-auto">
                   {course.registeredUsers.map((registeredUser) => (
-                    <li key={registeredUser.uid}>{registeredUser.displayName || "Nevtelen"}</li>
+                    <li key={registeredUser.uid}>
+                      {registeredUser.displayName || "Névtelen"}
+                    </li>
                   ))}
                 </ul>
               )}
@@ -141,11 +145,19 @@ const CourseCard: React.FC<Props> = ({
       )}
 
       <div className="flex-1 pr-8">
-        <h3 className={`text-lg font-semibold ${isExpired && isAdmin ? "line-through" : ""}`}>{course.title}</h3>
-        <p className={`text-sm text-gray-600 ${isExpired && isAdmin ? "line-through" : ""}`}>
+        <h3
+          className={`text-lg font-semibold ${isExpired && isAdmin ? "line-through" : ""}`}
+        >
+          {course.title}
+        </h3>
+        <p
+          className={`text-sm text-gray-600 ${isExpired && isAdmin ? "line-through" : ""}`}
+        >
           Ár: {course.price} Ft | Oktató: {course.instructor || "Nincs megadva"}
         </p>
-        <p className={`text-sm text-gray-600 ${isExpired && isAdmin ? "line-through" : ""}`}>
+        <p
+          className={`text-sm text-gray-600 ${isExpired && isAdmin ? "line-through" : ""}`}
+        >
           Időpont:{" "}
           {course.datetime
             ? new Date(course.datetime).toLocaleString("hu-HU", {
@@ -157,13 +169,19 @@ const CourseCard: React.FC<Props> = ({
               })
             : "Nincs megadva"}
         </p>
-        <p className={`text-sm mt-1 ${isExpired && isAdmin ? "line-through" : ""}`}>{course.lead}</p>
+        <p
+          className={`text-sm mt-1 ${isExpired && isAdmin ? "line-through" : ""}`}
+        >
+          {course.lead}
+        </p>
         {course.maxCapacity && (
           <p className="text-sm text-gray-600 mt-1">
             Helyek:{" "}
             <span
               className={`inline-block px-2 py-1 rounded-full text-xs ${
-                isFull ? "bg-red-100 text-red-600" : "bg-green-100 text-green-600"
+                isFull
+                  ? "bg-red-100 text-red-600"
+                  : "bg-green-100 text-green-600"
               }`}
             >
               {isFull ? "Betelt" : `${remainingSpots}/${course.maxCapacity}`}
@@ -210,7 +228,7 @@ const CourseCard: React.FC<Props> = ({
                     alert("Hiba: A tanfolyam ID-ja hianyzik!");
                   }
                 }}
-                className="bg-yellow-500 text-white px-2 py-1 rounded-md hover:bg-yellow-600 text-sm"
+                className="bg-yellow-500 text-white px-2 py-1 rounded-md hover:bg-yellow-600 text-sm mt-2"
               >
                 Szerkesztés
               </button>
