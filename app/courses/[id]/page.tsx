@@ -1,7 +1,6 @@
 ﻿"use client";
 
 import React, { useEffect, useState } from "react";
-import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { db, auth } from "../../../firebase";
 import {
@@ -30,7 +29,8 @@ interface Course {
 }
 
 const stripePromise = loadStripe(
-  process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!,
+  process.env
+    .pk_test_51RpMxOCjFsFckpeAKq3NdMTv8rOCdKBA1jIpx4ca2XYQ33R0JXyi0cEpZrv0XG5p5TQIvAcLtHbbgzH7GsrvLd0700bM9V0KuJ!,
 );
 
 const isExpiredCourse = (course: Course | null): boolean => {
@@ -117,21 +117,10 @@ const CourseDetails: React.FC = () => {
     fetchCourse();
   }, [id, user]);
 
-  const registerUser = async () => {
-    if (authLoading) {
-      alert("Kérlek várj, a hitelesytési állapot még betöltés alatt!");
-      return false;
-    }
-    if (!user || !user.uid) {
-      alert("Bejelentkezés szükséges a jelentkezéshez!");
-      return false;
-    }
-    if (!course?.id) {
-      alert("Érvenytelen kurzus!");
-      return false;
-    }
-    if (isExpiredCourse(course)) {
-      alert("Erre a lejárt kurzusra már nem lehet jelentkezni.");
+  const registerUser = async (): Promise<boolean> => {
+    if (authLoading || !user) return false;
+    if (!course || isExpiredCourse(course)) {
+      alert("Nem lehet jelentkezni erre a kurzusra.");
       return false;
     }
     if (course.registeredUsers.length >= course.maxCapacity) {
@@ -140,27 +129,12 @@ const CourseDetails: React.FC = () => {
     }
 
     try {
-      const courseRef = doc(db, "courses", course.id);
-      const courseSnap = await getDoc(courseRef);
-      if (!courseSnap.exists()) {
-        alert("A kurzus nem létezik!");
-        return false;
-      }
-
-      const currentUsers = courseSnap.data().registeredUsers || [];
-      if (
-        currentUsers.some(
-          (u: { uid: string; displayName: string }) => u.uid === user.uid,
-        )
-      ) {
-        alert("MÁr jelentkeztel erre a kurzusra!");
-        return false;
-      }
-
+      const courseRef = doc(db, "courses", course.id!);
       await updateDoc(courseRef, {
         registeredUsers: arrayUnion({
           uid: user.uid,
           displayName: user.displayName || "Névtelen",
+          email: user.email,
         }),
       });
 
@@ -170,140 +144,97 @@ const CourseDetails: React.FC = () => {
               ...prev,
               registeredUsers: [
                 ...prev.registeredUsers,
-                { uid: user.uid, displayName: user.displayName || "Névtelen" },
+                {
+                  uid: user.uid,
+                  displayName: user.displayName || "Névtelen",
+                  email: user.email,
+                },
               ],
             }
           : prev,
       );
       setIsRegistered(true);
-      // alert("Sikeres jelentkezes!");
+
+      // Email küldés + ICS + Google Calendar link
+      await fetch("/api/send-registration-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userName: user.displayName,
+          userEmail: user.email,
+          courseTitle: course.title,
+          courseDate: course.datetime,
+          courseId: course.id,
+          location: course.location,
+        }),
+      });
+
       return true;
-    } catch (error: unknown) {
-      console.error("Hiba a jelentkezés során:", error);
-      const errorMessage =
-        error instanceof Error ? error.message : "Ismeretlen hiba";
-      alert(`Hiba történt a jelentkezés közben: ${errorMessage}`);
+    } catch (err) {
+      console.error(err);
       return false;
     }
   };
 
-  const handleUnregister = async () => {
-    if (authLoading) {
-      alert("Kérlek várj, a hitelesitesi állapot meg betöltes alatt!");
-      return;
-    }
-    if (!user || !user.uid || !course?.id) {
-      alert("Érvenytelen kurzus vagy felhasználó!");
-      return;
-    }
+const handleUnregister = async () => {
+  if (!user || !user.uid) {
+    alert("Érvénytelen felhasználó!");
+    return;
+  }
 
-    try {
-      const courseRef = doc(db, "courses", course.id);
-      const courseSnap = await getDoc(courseRef);
-      if (!courseSnap.exists()) {
-        alert("A kurzus nem létezik!");
-        return;
-      }
+  if (!course?.id) {
+    alert("Érvénytelen kurzus!");
+    return;
+  }
 
-      if (
-        courseSnap
-          .data()
-          .registeredUsers?.some(
-            (u: { uid: string; displayName: string }) => u.uid === user.uid,
-          )
-      ) {
-        await updateDoc(courseRef, {
-          registeredUsers: arrayRemove({
-            uid: user.uid,
-            displayName: user.displayName || "Névtelen",
-          }),
-        });
+  const courseRef = doc(db, "courses", course.id); // course.id használata
+  const courseSnap = await getDoc(courseRef);
 
-        setCourse((prev) =>
-          prev
-            ? {
-                ...prev,
-                registeredUsers: prev.registeredUsers.filter(
-                  (u) => u.uid !== user.uid,
-                ),
-              }
-            : prev,
-        );
-        setIsRegistered(false);
-        alert("Jelentkezés sikeresen visszavonva!");
-      } else {
-        alert("Nem vagy jelentkezve erre a kurzusra!");
-      }
-    } catch (error: unknown) {
-      console.error("Hiba a jelentkezés visszavonása során:", error);
-      const errorMessage =
-        error instanceof Error ? error.message : "Ismeretlen hiba";
-      alert(`Hiba történt a jelentkezés visszavonása közben: ${errorMessage}`);
-    }
-  };
+  if (!courseSnap.exists()) {
+    alert("A kurzus nem létezik!");
+    return;
+  }
+
+  const currentUsers = courseSnap.data()?.registeredUsers || [];
+  const isRegistered = currentUsers.some(
+    (u: { uid: string; displayName: string }) => u.uid === user.uid
+  );
+
+  if (!isRegistered) {
+    alert("Nem vagy jelentkezve erre a kurzusra!");
+    return;
+  }
+
+  await updateDoc(courseRef, {
+    registeredUsers: arrayRemove({
+      uid: user.uid,
+      displayName: user.displayName || "Névtelen",
+    }),
+  });
+
+  setCourse(prev => prev ? {
+    ...prev,
+    registeredUsers: prev.registeredUsers.filter(u => u.uid !== user.uid)
+  } : prev);
+
+  setIsRegistered(false);
+  alert("Jelentkezés sikeresen visszavonva!");
+};
 
   const handlePayment = async () => {
-    if (!user || !user.uid || !user.email) {
-      alert("Bejelentkezés szükséges, és az email cím nem lehet üres!");
-      return;
-    }
-    if (!course || !course.id || !course.title || !course.price) {
-      alert("Érvénytelen kurzus adatok!");
-      return;
-    }
-    if (isExpiredCourse(course)) {
-      alert("Lejárt kurzusra nem lehet befizetni.");
-      return;
-    }
-
+    if (!user || !course) return;
     setPaymentLoading(true);
     try {
-      const stripeReady = stripePromise;
-      const response = await fetch("/api/create-checkout-session", {
+      const stripe = await stripePromise;
+      const res = await fetch("/api/create-checkout-session", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          courseId: course.id,
-          courseTitle: course.title,
-          coursePrice: course.price,
-          userId: user.uid,
-          userEmail: user.email,
-        }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ courseId: course.id, userEmail: user.email }),
       });
-
-      if (!response.ok) {
-        const text = await response.text();
-        throw new Error(`API error: ${response.status} - ${text}`);
-      }
-
-      const contentType = response.headers.get("content-type") || "";
-      if (!contentType.includes("application/json")) {
-        throw new Error("Received non-JSON response from API");
-      }
-
-      const data: { sessionId: string } = await response.json();
-      if (!data.sessionId) {
-        throw new Error("Stripe session ID missing in response");
-      }
-
-      const stripe = await stripeReady;
-      if (!stripe) {
-        throw new Error("Stripe initialization failed");
-      }
-
-      const { error } = await stripe.redirectToCheckout({
-        sessionId: data.sessionId,
-      });
-      if (error) {
-        throw new Error(`Stripe checkout error: ${error.message}`);
-      }
-    } catch (error: unknown) {
-      console.error("Hiba a fizetesi folyamat soran:", error);
-      const errorMessage =
-        error instanceof Error ? error.message : "Ismeretlen hiba";
-      alert(`Hiba tortent a fizetes kozben: ${errorMessage}`);
+      const data = await res.json();
+      await stripe?.redirectToCheckout({ sessionId: data.sessionId });
+    } catch (err) {
+      console.error(err);
     } finally {
       setPaymentLoading(false);
     }
@@ -445,31 +376,28 @@ const CourseDetails: React.FC = () => {
                 : `Már csak ${remainingSpots} hely van!`}
           </p>
 
-          {!isExpired && !isFull && !isRegistered && (
+          {!isRegistered && (
             <button
-              className="w-full bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 mb-2 disabled:opacity-50"
               onClick={registerUser}
-              disabled={authLoading || !user}
+              className="bg-blue-500 text-white p-2 rounded-md"
             >
               Jelentkezés
             </button>
           )}
-
-          {!isExpired && isRegistered && (
+          {isRegistered && (
             <>
               <button
-                className="w-full bg-red-500 text-white px-4 py-2 rounded-md hover:bg-red-600 mb-2 disabled:opacity-50"
                 onClick={handleUnregister}
-                disabled={authLoading}
+                className="bg-red-500 text-white p-2 rounded-md"
               >
-                Jelentkezés visszavonása
+                Lemondás
               </button>
               <button
-                className="w-full bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600 mb-2 disabled:opacity-50"
                 onClick={handlePayment}
-                disabled={paymentLoading || !user}
+                className="bg-green-500 text-white p-2 rounded-md"
+                disabled={paymentLoading}
               >
-                {paymentLoading ? "Fizetes folyamatban..." : "Fizetes"}
+                Fizetés
               </button>
             </>
           )}
