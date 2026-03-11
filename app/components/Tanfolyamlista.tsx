@@ -28,15 +28,26 @@ interface Props {
   setShowLoginModal: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
+
+
+
 const CourseList: React.FC<Props> = ({ courses, isAdmin, setShowForm, setCourses, user, setShowLoginModal }) => {
+  
+  const activeCourses = courses.filter((course) => {
+  if (!course.datetime) return true;
+  const courseDate = new Date(course.datetime);
+  if (Number.isNaN(courseDate.getTime())) return true;
+  return courseDate.getTime() >= Date.now();
+});
+  
   return (
     <div className="w-80 bg-white p-4 rounded-lg shadow-lg max-h-[calc(100vh-400px)] overflow-y-auto">
       <h3 className="text-lg font-bold mb-2">Összes tanfolyam</h3>
-      {courses.length === 0 ? (
+      {activeCourses.length === 0 ? (
         <p>Nincs tanfolyam.</p>
       ) : (
         <ul className="space-y-2">
-          {courses.map((course) => (
+          {activeCourses.map((course) => (
             <CourseCard
               key={course.id}
               course={course}

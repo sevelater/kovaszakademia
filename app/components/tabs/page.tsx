@@ -368,7 +368,7 @@ const Tabs: React.FC = () => {
 
   const coursesForTab =
     activeTab === "Rendelések"
-      ? visibleCourses
+      ? []
       : visibleCourses.filter((course) =>
           course.categories.includes(activeTab),
         );
@@ -525,24 +525,27 @@ const Tabs: React.FC = () => {
 
   const renderCoursesPanel = () => (
     <div className="flex gap-6">
-      <div className="w-80 flex flex-col gap-4">
-        <CourseList
-          courses={visibleCourses}
-          isAdmin={isAdmin}
-          setShowForm={setShowForm}
-          setCourses={setCourses}
-          user={user}
-          setShowLoginModal={setShowLoginModal}
-        />
-        <CalendarView
-          courses={visibleCourses}
-          isAdmin={isAdmin}
-          user={user}
-          setShowLoginModal={setShowLoginModal}
-        />
-      </div>
+      {isAdmin && (
+        <div className="flex flex-col gap-4">
+          {" "}
+          <CourseList
+            courses={visibleCourses}
+            isAdmin={isAdmin}
+            setShowForm={setShowForm}
+            setCourses={setCourses}
+            user={user}
+            setShowLoginModal={setShowLoginModal}
+          />
+          <CalendarView
+            courses={visibleCourses}
+            isAdmin={isAdmin}
+            user={user}
+            setShowLoginModal={setShowLoginModal}
+          />
+        </div>
+      )}
 
-      <div className="flex-1">
+      <div className="justify-center">
         <div className="flex flex-wrap mb-6">
           {["Rendelések", ...categories].map((label) => (
             <button
@@ -597,7 +600,9 @@ const Tabs: React.FC = () => {
             {activeCoursesInTab.length === 0 &&
             expiredCoursesInTab.length === 0 ? (
               <p className="text-gray-600">
-                Nincs tanfolyam ebben a kategóriában.
+                {activeTab === "Rendelések"
+                  ? "Nincsenek rendelések."
+                  : "Nincs tanfolyam ebben a kategóriában."}
               </p>
             ) : (
               <>
@@ -795,9 +800,9 @@ const Tabs: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen relative overflow-hidden p-10">
+    <div className="min-h-screen relative overflow-hidden p-5">
       <div className="flex items-center justify-between gap-4">
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 pl-6">
           {isAdmin &&
             (["Kurzusok", "Jogosultság", "Adatok"] as AdminSection[]).map(
               (section) => (

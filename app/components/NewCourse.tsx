@@ -259,7 +259,7 @@ export default function CourseForm({
               onChange={(event) =>
                 setForm((prev) => ({ ...prev, instructor: event.target.value }))
               }
-              className="w-full p-2 border rounded-md"
+              className="w-full p-2 border rounded-md cursor-pointer"
             >
               <option value="">Válassz mentett oktatót</option>
               {instructorOptions.map((option) => (
@@ -285,9 +285,9 @@ export default function CourseForm({
               onChange={(event) =>
                 setForm((prev) => ({ ...prev, location: event.target.value }))
               }
-              className="w-full p-2 border rounded-md"
+              className="w-full p-2 border rounded-md cursor-pointer"
             >
-              <option value="">Válassz mentett helyszínt</option>
+              <option value="" >Válassz mentett helyszínt</option>
               {locationOptions.map((option) => (
                 <option key={option} value={option}>
                   {option}
@@ -303,7 +303,7 @@ export default function CourseForm({
               name="year"
               value={form.year}
               onChange={handleFormChange}
-              className="p-2 rounded-md bg-white/30 text-gray-700 cursor-pointer shadow-md"
+              className="p-2 rounded-md bg-white/30 text-gray-700 cursor-pointer shadow-md hover:bg-white duration-200 ease-in-out"
               required
             >
               <option value="">Év</option>
@@ -317,7 +317,7 @@ export default function CourseForm({
               name="month"
               value={form.month}
               onChange={handleFormChange}
-              className="p-2 rounded-md bg-white/30 text-gray-700 cursor-pointer shadow-md"
+              className="p-2 rounded-md bg-white/30 text-gray-700 cursor-pointer shadow-md hover:bg-white duration-200 ease-in-out"
               required
             >
               <option value="">Hónap</option>
@@ -331,7 +331,7 @@ export default function CourseForm({
               name="day"
               value={form.day}
               onChange={handleFormChange}
-              className="p-2 rounded-md bg-white/30 text-gray-700 cursor-pointer shadow-md"
+              className="p-2 rounded-md bg-white/30 text-gray-700 cursor-pointer shadow-md hover:bg-white duration-200 ease-in-out"
               required
             >
               <option value="">Nap</option>
@@ -345,7 +345,7 @@ export default function CourseForm({
               name="hour"
               value={form.hour}
               onChange={handleFormChange}
-              className="p-2 rounded-md bg-white/30 text-gray-700 cursor-pointer shadow-md"
+              className="p-2 rounded-md bg-white/30 text-gray-700 cursor-pointer shadow-md hover:bg-white duration-200 ease-in-out"
               required
             >
               <option value="">Óra</option>
@@ -359,7 +359,7 @@ export default function CourseForm({
               name="minute"
               value={form.minute}
               onChange={handleFormChange}
-              className="p-2 rounded-md bg-white/30 text-gray-700 cursor-pointer shadow-md"
+              className="p-2 rounded-md bg-white/30 text-gray-700 cursor-pointer shadow-md hover:bg-white duration-200 ease-in-out"
               required
             >
               <option value="">Perc</option>

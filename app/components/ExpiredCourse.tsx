@@ -58,7 +58,7 @@ const CourseCard: React.FC<Props> = ({
 
   const handleDelete = async () => {
     if (!isAdmin) {
-      alert("Nincs jogosultsagod tanfolyamot torolni!");
+      alert("Nincs jogosultságod tanfolyamot törölni!");
       return;
     }
 
@@ -118,7 +118,7 @@ const CourseCard: React.FC<Props> = ({
               e.stopPropagation();
               setShowRegistrantInfo((prev) => !prev);
             }}
-            className="w-6 h-6 rounded-full border-2 border-blue-500 text-blue-600 text-xs font-bold bg-white hover:bg-blue-50"
+            className="w-6 h-6 rounded-full border-2 border-blue-500 text-blue-600 text-xs font-bold bg-white hover:bg-blue-100 hover:border-white"
             title="Jelentkezők"
           >
             i
