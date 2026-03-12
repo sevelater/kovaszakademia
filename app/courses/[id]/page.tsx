@@ -3,13 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { db, auth } from "../../../firebase";
-import {
-  doc,
-  getDoc,
-  updateDoc,
-  arrayUnion,
-  arrayRemove,
-} from "firebase/firestore";
+import { doc, getDoc, updateDoc, arrayUnion } from "firebase/firestore";
 import { User } from "firebase/auth";
 import { loadStripe } from "@stripe/stripe-js";
 
@@ -184,18 +178,21 @@ const CourseDetails: React.FC = () => {
       const paymentLink = `${process.env.NEXT_PUBLIC_BASE_URL}/courses/${courseId}?pay=true`;
 
       // Email küldés Resend-del
+      const emailData = {
+        userName: user.displayName,
+        userEmail: user.email,
+        courseTitle: course.title,
+        courseDate: course.datetime,
+        courseId: course.id,
+        location: course.location,
+        paymentLink,
+      };
+
+      console.log("Sending email to:", emailData.userEmail); // <-- itt már jó
       await fetch("/api/send-registration-email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userName: user.displayName,
-          userEmail: user.email,
-          courseTitle: course.title,
-          courseDate: course.datetime,
-          courseId: course.id,
-          location: course.location,
-          paymentLink,
-        }),
+        body: JSON.stringify(emailData),
       });
 
       alert("Sikeres jelentkezés! Ellenőrizd az emailed a visszaigazolásért.");
