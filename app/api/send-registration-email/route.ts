@@ -29,9 +29,7 @@ export async function POST(req: Request) {
     : [];
   const isModular = courseCategories.includes(modularCategory);
 
-  const cancelLink =
-    `${siteUrl}/api/unregister` +
-    `?courseId=${body.courseId}&email=${body.userEmail}`;
+  const cancelLink = `${siteUrl}/api/unregister?courseId=${encodeURIComponent(body.courseId)}&email=${encodeURIComponent(body.userEmail)}`;
   const inviteLink = `${siteUrl}/api/calendar-invite?courseId=${body.courseId}`;
 
   const rawSessions: CourseSession[] = Array.isArray(body.courseSessions)
