@@ -16,6 +16,8 @@ interface Course {
   description?: string;
   categories: string[];
   datetime?: string;
+  endDatetime?: string;
+  sessions?: { start: string; end: string }[];
   images?: string[];
   maxCapacity: number;
   registeredUsers: { uid: string; displayName: string }[];
@@ -28,47 +30,85 @@ type Props = {
   setShowLoginModal: React.Dispatch<React.SetStateAction<boolean>>;
 };
 
+const getCourseSessions = (course: Course): { start: string; end: string }[] => {
+  if (course.sessions && course.sessions.length > 0) {
+    return course.sessions.filter((session) => session.start);
+  }
+  if (!course.datetime) return [];
+  const start = course.datetime;
+  const startDate = new Date(start);
+  if (Number.isNaN(startDate.getTime())) return [];
+  const end =
+    course.endDatetime ||
+    new Date(startDate.getTime() + 2 * 60 * 60 * 1000).toISOString();
+  return [{ start, end }];
+};
+
 const isExpiredCourse = (course: Course): boolean => {
-  if (!course.datetime) return false;
-  const courseDate = new Date(course.datetime);
-  if (Number.isNaN(courseDate.getTime())) return false;
-  return courseDate.getTime() < Date.now();
+  const sessions = getCourseSessions(course);
+  if (sessions.length === 0) return false;
+  const lastEnd = sessions
+    .map((session) => new Date(session.end))
+    .filter((date) => !Number.isNaN(date.getTime()))
+    .sort((a, b) => b.getTime() - a.getTime())[0];
+  if (!lastEnd) return false;
+  return lastEnd.getTime() < Date.now();
+};
+
+type SelectedCourse = {
+  course: Course;
+  sessionStart?: string;
+  sessionEnd?: string;
 };
 
 export default function CalendarView({ courses, isAdmin, user, setShowLoginModal }: Props) {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-  const [selectedCourses, setSelectedCourses] = useState<Course[]>([]);
+  const [selectedCourses, setSelectedCourses] = useState<SelectedCourse[]>([]);
 
-  const visibleCourses = isAdmin ? courses : courses.filter((course) => !isExpiredCourse(course));
+  const visibleCourses = courses.filter((course) => !isExpiredCourse(course));
 
   const tileContent = ({ date, view }: { date: Date; view: string }) => {
     if (view === "month") {
-      const courseDates = visibleCourses.filter((course) => {
-        if (!course.datetime) return false;
-        const courseDate = new Date(course.datetime);
-        return (
-          courseDate.getFullYear() === date.getFullYear() &&
-          courseDate.getMonth() === date.getMonth() &&
-          courseDate.getDate() === date.getDate()
-        );
+      const courseDates = visibleCourses.flatMap((course) => {
+        const sessions = getCourseSessions(course);
+        return sessions
+          .filter((session) => {
+            const courseDate = new Date(session.start);
+            if (Number.isNaN(courseDate.getTime())) return false;
+            return (
+              courseDate.getFullYear() === date.getFullYear() &&
+              courseDate.getMonth() === date.getMonth() &&
+              courseDate.getDate() === date.getDate()
+            );
+          })
+          .map((session) => ({ course, session }));
       });
 
       if (courseDates.length > 0) {
         return (
           <div className="relative">
-            {courseDates.map((course, index) => {
+            {courseDates.map(({ course, session }, index) => {
               const isFull = course.maxCapacity && course.registeredUsers
                 ? course.registeredUsers.length >= course.maxCapacity
                 : false;
+              const startTime = new Date(session.start);
+              const endTime = new Date(session.end);
               return (
                 <div
                   key={index}
                   className={`absolute bottom-0 left-0 w-2 h-2 rounded-full ${isFull ? "bg-red-500" : "bg-green-500"}`}
                   style={{ left: `${index * 4}px` }}
-                  title={`${course.title} - ${new Date(course.datetime!).toLocaleTimeString("hu-HU", {
+                  title={`${course.title} - ${startTime.toLocaleTimeString("hu-HU", {
                     hour: "2-digit",
                     minute: "2-digit",
-                  })} ${isFull ? "(Betelt)" : ""}`}
+                  })}${
+                    Number.isNaN(endTime.getTime())
+                      ? ""
+                      : `–${endTime.toLocaleTimeString("hu-HU", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}`
+                  } ${isFull ? "(Betelt)" : ""}`}
                 />
               );
             })}
@@ -82,14 +122,23 @@ export default function CalendarView({ courses, isAdmin, user, setShowLoginModal
 
   const handleDayClick = (date: Date) => {
     setSelectedDate(date);
-    const filteredCourses = visibleCourses.filter((course) => {
-      if (!course.datetime) return false;
-      const courseDate = new Date(course.datetime);
-      return (
-        courseDate.getFullYear() === date.getFullYear() &&
-        courseDate.getMonth() === date.getMonth() &&
-        courseDate.getDate() === date.getDate()
-      );
+    const filteredCourses = visibleCourses.flatMap((course) => {
+      const sessions = getCourseSessions(course);
+      return sessions
+        .filter((session) => {
+          const courseDate = new Date(session.start);
+          if (Number.isNaN(courseDate.getTime())) return false;
+          return (
+            courseDate.getFullYear() === date.getFullYear() &&
+            courseDate.getMonth() === date.getMonth() &&
+            courseDate.getDate() === date.getDate()
+          );
+        })
+        .map((session) => ({
+          course,
+          sessionStart: session.start,
+          sessionEnd: session.end,
+        }));
     });
     setSelectedCourses(filteredCourses);
   };
@@ -105,13 +154,16 @@ export default function CalendarView({ courses, isAdmin, user, setShowLoginModal
         tileClassName={({ date, view }) => {
           if (view === "month") {
             const hasCourse = visibleCourses.some((course) => {
-              if (!course.datetime) return false;
-              const courseDate = new Date(course.datetime);
-              return (
-                courseDate.getFullYear() === date.getFullYear() &&
-                courseDate.getMonth() === date.getMonth() &&
-                courseDate.getDate() === date.getDate()
-              );
+              const sessions = getCourseSessions(course);
+              return sessions.some((session) => {
+                const courseDate = new Date(session.start);
+                if (Number.isNaN(courseDate.getTime())) return false;
+                return (
+                  courseDate.getFullYear() === date.getFullYear() &&
+                  courseDate.getMonth() === date.getMonth() &&
+                  courseDate.getDate() === date.getDate()
+                );
+              });
             });
             return hasCourse ? "bg-black" : null;
           }
@@ -127,16 +179,18 @@ export default function CalendarView({ courses, isAdmin, user, setShowLoginModal
             <p>Nincs tanfolyam ezen a napon.</p>
           ) : (
             <ul className="space-y-2 max-h-48 overflow-y-auto">
-              {selectedCourses.slice(0, 2).map((course) => (
+              {selectedCourses.slice(0, 2).map((entry) => (
                 <CourseCard
-                  key={course.id}
-                  course={course}
+                  key={`${entry.course.id}-${entry.sessionStart}`}
+                  course={entry.course}
                   isAdmin={false}
                   setCourses={() => {}}
                   setShowForm={() => {}}
                   hideAdminActions={true}
                   user={user}
                   setShowLoginModal={setShowLoginModal}
+                  displayStart={entry.sessionStart}
+                  displayEnd={entry.sessionEnd}
                 />
               ))}
               {selectedCourses.length > 2 && (

@@ -54,16 +54,46 @@ export interface Course {
   description?: string;
   categories: string[];
   datetime?: string;
+  endDatetime?: string;
+  sessions?: { start: string; end: string }[];
   images?: string[];
   maxCapacity: number;
   registeredUsers: { uid: string; displayName: string }[];
 }
 
+const getCourseSessions = (course: Course): { start: string; end: string }[] => {
+  if (course.sessions && course.sessions.length > 0) {
+    return course.sessions.filter((session) => session.start);
+  }
+  if (!course.datetime) return [];
+  const start = course.datetime;
+  const startDate = new Date(start);
+  if (Number.isNaN(startDate.getTime())) return [];
+  const end =
+    course.endDatetime ||
+    new Date(startDate.getTime() + 2 * 60 * 60 * 1000).toISOString();
+  return [{ start, end }];
+};
+
+const getCourseStartTime = (course: Course): number | null => {
+  const sessions = getCourseSessions(course);
+  if (sessions.length === 0) return null;
+  const earliest = sessions
+    .map((session) => new Date(session.start))
+    .filter((date) => !Number.isNaN(date.getTime()))
+    .sort((a, b) => a.getTime() - b.getTime())[0];
+  return earliest ? earliest.getTime() : null;
+};
+
 const isExpiredCourse = (course: Course): boolean => {
-  if (!course.datetime) return false;
-  const courseDate = new Date(course.datetime);
-  if (Number.isNaN(courseDate.getTime())) return false;
-  return courseDate.getTime() < Date.now();
+  const sessions = getCourseSessions(course);
+  if (sessions.length === 0) return false;
+  const lastEnd = sessions
+    .map((session) => new Date(session.end))
+    .filter((date) => !Number.isNaN(date.getTime()))
+    .sort((a, b) => b.getTime() - a.getTime())[0];
+  if (!lastEnd) return false;
+  return lastEnd.getTime() < Date.now();
 };
 
 const toLocalDateTimeInput = (date: Date): string => {
@@ -95,6 +125,32 @@ const getCloneDateTime = (originalDateTime?: string): string => {
   return toLocalDateTimeInput(now);
 };
 
+const getCloneEndDateTime = (
+  originalEndDateTime: string | undefined,
+  fallbackStart: string,
+): string => {
+  const startDate = new Date(fallbackStart);
+  if (Number.isNaN(startDate.getTime())) {
+    return toLocalDateTimeInput(new Date());
+  }
+
+  if (originalEndDateTime) {
+    const originalEnd = new Date(originalEndDateTime);
+    if (!Number.isNaN(originalEnd.getTime())) {
+      startDate.setHours(
+        originalEnd.getHours(),
+        originalEnd.getMinutes(),
+        0,
+        0,
+      );
+      return toLocalDateTimeInput(startDate);
+    }
+  }
+
+  startDate.setHours(startDate.getHours() + 2);
+  return toLocalDateTimeInput(startDate);
+};
+
 const isPermissionDenied = (error: unknown): boolean => {
   if (!error || typeof error !== "object") return false;
   if (!("code" in error)) return false;
@@ -108,7 +164,7 @@ const sortHu = (items: string[]): string[] =>
 
 const Tabs: React.FC = () => {
   const [adminSection, setAdminSection] = useState<AdminSection>("Kurzusok");
-  const [activeTab, setActiveTab] = useState<string>("Rendelések");
+  const [activeTab, setActiveTab] = useState<string>(categories[0]);
   const [showForm, setShowForm] = useState<string>("");
   const [courses, setCourses] = useState<Course[]>([]);
   const [user, setUser] = useState<User | null>(null);
@@ -213,30 +269,32 @@ const Tabs: React.FC = () => {
         const querySnapshot: QuerySnapshot<DocumentData> = await getDocs(
           collection(db, "courses"),
         );
-        const coursesData: Course[] = querySnapshot.docs.map((docItem) => {
-          const data = docItem.data();
-          return {
-            id: docItem.id,
-            title: data.title || "Nincs cím",
-            price: data.price || 0,
-            instructor: data.instructor,
-            location: data.location,
-            lead: data.lead || "",
-            description: data.description,
-            categories: data.categories || [],
-            datetime: data.datetime,
-            images: data.images,
-            maxCapacity: data.maxCapacity || 0,
-            registeredUsers: data.registeredUsers || [],
-          };
-        });
+          const coursesData: Course[] = querySnapshot.docs.map((docItem) => {
+            const data = docItem.data();
+            return {
+              id: docItem.id,
+              title: data.title || "Nincs cím",
+              price: data.price || 0,
+              instructor: data.instructor,
+              location: data.location,
+              lead: data.lead || "",
+              description: data.description,
+              categories: data.categories || [],
+              datetime: data.datetime,
+              endDatetime: data.endDatetime,
+              sessions: data.sessions,
+              images: data.images,
+              maxCapacity: data.maxCapacity || 0,
+              registeredUsers: data.registeredUsers || [],
+            };
+          });
 
-        coursesData.sort((a, b) => {
-          if (!a.datetime || !b.datetime) return 0;
-          return (
-            new Date(a.datetime).getTime() - new Date(b.datetime).getTime()
-          );
-        });
+          coursesData.sort((a, b) => {
+            const aTime = getCourseStartTime(a);
+            const bTime = getCourseStartTime(b);
+            if (aTime === null || bTime === null) return 0;
+            return aTime - bTime;
+          });
 
         setCourses(coursesData);
       } catch (error) {
@@ -351,10 +409,15 @@ const Tabs: React.FC = () => {
 
   const clonedCourse = useMemo(() => {
     if (!isCloneMode || !selectedCourse) return undefined;
+    const clonedStart = getCloneDateTime(selectedCourse.datetime);
     return {
       ...selectedCourse,
       id: undefined,
-      datetime: getCloneDateTime(selectedCourse.datetime),
+      datetime: clonedStart,
+      endDatetime: getCloneEndDateTime(
+        selectedCourse.endDatetime,
+        clonedStart,
+      ),
       registeredUsers: [],
     };
   }, [isCloneMode, selectedCourse]);
@@ -367,11 +430,7 @@ const Tabs: React.FC = () => {
     : courses.filter((course) => !isExpiredCourse(course));
 
   const coursesForTab =
-    activeTab === "Rendelések"
-      ? []
-      : visibleCourses.filter((course) =>
-          course.categories.includes(activeTab),
-        );
+    visibleCourses.filter((course) => course.categories.includes(activeTab));
 
   const activeCoursesInTab = coursesForTab.filter(
     (course) => !isExpiredCourse(course),
@@ -547,7 +606,7 @@ const Tabs: React.FC = () => {
 
       <div className="justify-center">
         <div className="flex flex-wrap mb-6">
-          {["Rendelések", ...categories].map((label) => (
+          {categories.map((label) => (
             <button
               key={label}
               onClick={() => {
@@ -600,9 +659,7 @@ const Tabs: React.FC = () => {
             {activeCoursesInTab.length === 0 &&
             expiredCoursesInTab.length === 0 ? (
               <p className="text-gray-600">
-                {activeTab === "Rendelések"
-                  ? "Nincsenek rendelések."
-                  : "Nincs tanfolyam ebben a kategóriában."}
+                Nincs tanfolyam ebben a kategóriában.
               </p>
             ) : (
               <>

@@ -13,6 +13,8 @@ const categories = [
   "Oktatói franchise",
 ];
 
+const modularCategory = "Moduláris képzéseink";
+
 type Course = {
   id?: string;
   title: string;
@@ -23,6 +25,8 @@ type Course = {
   description?: string;
   categories: string[];
   datetime?: string;
+  endDatetime?: string;
+  sessions?: { start: string; end: string }[];
   images?: string[];
   maxCapacity: number;
   registeredUsers: { uid: string; displayName: string }[];
@@ -38,6 +42,60 @@ type Props = {
   locationOptions?: string[];
 };
 
+type SessionInput = {
+  year: string;
+  month: string;
+  day: string;
+  startHour: string;
+  startMinute: string;
+  endHour: string;
+  endMinute: string;
+};
+
+const createEmptySession = (): SessionInput => ({
+  year: "",
+  month: "",
+  day: "",
+  startHour: "",
+  startMinute: "",
+  endHour: "",
+  endMinute: "",
+});
+
+const sessionFromDate = (start?: string, end?: string): SessionInput => {
+  if (!start) return createEmptySession();
+  const startDate = new Date(start);
+  if (Number.isNaN(startDate.getTime())) return createEmptySession();
+  const endDate = end ? new Date(end) : null;
+  return {
+    year: String(startDate.getFullYear()),
+    month: String(startDate.getMonth() + 1).padStart(2, "0"),
+    day: String(startDate.getDate()).padStart(2, "0"),
+    startHour: String(startDate.getHours()).padStart(2, "0"),
+    startMinute: String(startDate.getMinutes()).padStart(2, "0"),
+    endHour: endDate && !Number.isNaN(endDate.getTime())
+      ? String(endDate.getHours()).padStart(2, "0")
+      : "",
+    endMinute: endDate && !Number.isNaN(endDate.getTime())
+      ? String(endDate.getMinutes()).padStart(2, "0")
+      : "",
+  };
+};
+
+const buildSessionDateTimes = (session: SessionInput) => {
+  const { year, month, day, startHour, startMinute, endHour, endMinute } = session;
+  if (!year || !month || !day || !startHour || !startMinute || !endHour || !endMinute) {
+    return null;
+  }
+  const start = `${year}-${month}-${day}T${startHour}:${startMinute}`;
+  const end = `${year}-${month}-${day}T${endHour}:${endMinute}`;
+  const startDate = new Date(start);
+  const endDate = new Date(end);
+  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) return null;
+  if (endDate.getTime() <= startDate.getTime()) return null;
+  return { start, end };
+};
+
 export default function CourseForm({
   mode,
   course,
@@ -47,7 +105,8 @@ export default function CourseForm({
   instructorOptions = [],
   locationOptions = [],
 }: Props) {
-  const years = Array.from({ length: 6 }, (_, i) => 2025 + i);
+  const currentYear = new Date().getFullYear();
+  const years = Array.from({ length: 6 }, (_, i) => currentYear + i);
   const months = Array.from({ length: 12 }, (_, i) =>
     String(i + 1).padStart(2, "0"),
   );
@@ -59,6 +118,15 @@ export default function CourseForm({
   );
   const minutes = ["00", "15", "30", "45"];
 
+  const initialSessions =
+    course?.sessions && course.sessions.length > 0
+      ? course.sessions.map((session) =>
+          sessionFromDate(session.start, session.end),
+        )
+      : course?.datetime
+        ? [sessionFromDate(course.datetime, course.endDatetime)]
+        : [createEmptySession()];
+
   const [form, setForm] = useState({
     title: course?.title || "",
     price: course?.price.toString() || "",
@@ -67,25 +135,29 @@ export default function CourseForm({
     lead: course?.lead || "",
     description: course?.description || "",
     categories: course?.categories || [],
-    datetime: course?.datetime || "",
-    year: course?.datetime ? course.datetime.split("T")[0].split("-")[0] : "",
-    month: course?.datetime ? course.datetime.split("T")[0].split("-")[1] : "",
-    day: course?.datetime ? course.datetime.split("T")[0].split("-")[2] : "",
-    hour: course?.datetime ? course.datetime.split("T")[1].split(":")[0] : "",
-    minute: course?.datetime ? course.datetime.split("T")[1].split(":")[1] : "",
     maxCapacity: course?.maxCapacity?.toString() || "",
   });
 
+  const [sessions, setSessions] = useState<SessionInput[]>(initialSessions);
   const [loading, setLoading] = useState<boolean>(false);
   const [progress, setProgress] = useState<string>("");
+  const isModular = form.categories.includes(modularCategory);
 
   const handleCategoryToggle = (category: string) => {
-    setForm((prev) => ({
-      ...prev,
-      categories: prev.categories.includes(category)
+    setForm((prev) => {
+      const nextCategories = prev.categories.includes(category)
         ? prev.categories.filter((c) => c !== category)
-        : [...prev.categories, category],
-    }));
+        : [...prev.categories, category];
+      if (!nextCategories.includes(modularCategory)) {
+        setSessions((prevSessions) =>
+          prevSessions.length > 0 ? [prevSessions[0]] : [createEmptySession()],
+        );
+      }
+      return {
+        ...prev,
+        categories: nextCategories,
+      };
+    });
   };
 
   const handleFormChange = (
@@ -94,18 +166,27 @@ export default function CourseForm({
     >,
   ) => {
     const { name, value } = e.target;
-    setForm((prev) => {
-      const updatedForm = { ...prev, [name]: value };
-      if (["year", "month", "day", "hour", "minute"].includes(name)) {
-        const { year, month, day, hour, minute } = updatedForm;
-        if (year && month && day && hour && minute) {
-          updatedForm.datetime = `${year}-${month}-${day}T${hour}:${minute}`;
-        } else {
-          updatedForm.datetime = "";
-        }
-      }
-      return updatedForm;
-    });
+    setForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleSessionChange = (
+    index: number,
+    field: keyof SessionInput,
+    value: string,
+  ) => {
+    setSessions((prev) =>
+      prev.map((session, idx) =>
+        idx === index ? { ...session, [field]: value } : session,
+      ),
+    );
+  };
+
+  const addSession = () => {
+    setSessions((prev) => [...prev, createEmptySession()]);
+  };
+
+  const removeSession = (index: number) => {
+    setSessions((prev) => prev.filter((_, idx) => idx !== index));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -124,6 +205,31 @@ export default function CourseForm({
     setProgress("Képek feltöltése és tanfolyam mentése...");
 
     try {
+      const parsedSessions = sessions.map((session) =>
+        buildSessionDateTimes(session),
+      );
+      if (parsedSessions.some((session) => session === null)) {
+        alert(
+          "Kérlek add meg minden alkalomnál a teljes kezdő és záró időpontot.",
+        );
+        return;
+      }
+
+      const normalizedSessions = parsedSessions.filter(
+        (session): session is { start: string; end: string } => session !== null,
+      );
+
+      if (normalizedSessions.length === 0) {
+        alert("Kérlek adj meg érvényes időpontot.");
+        return;
+      }
+
+      if (isModular && normalizedSessions.length < 2) {
+        alert("Moduláris képzéshez legalább két időpontot adj meg.");
+        return;
+      }
+
+      const primarySession = normalizedSessions[0];
       const courseData = {
         title: form.title,
         price: parseInt(form.price),
@@ -132,15 +238,14 @@ export default function CourseForm({
         lead: form.lead,
         description: form.description,
         categories: form.categories,
-        datetime: form.datetime,
+        datetime: primarySession.start,
+        endDatetime: primarySession.end,
+        sessions: isModular ? normalizedSessions : [],
         maxCapacity,
         registeredUsers: mode === "edit" ? course?.registeredUsers || [] : [],
       };
 
-      if (
-        courseData.datetime &&
-        !isNaN(new Date(courseData.datetime).getTime())
-      ) {
+      if (!isNaN(new Date(courseData.datetime).getTime())) {
         const firestoreTimeout = new Promise<never>((_, reject) =>
           setTimeout(
             () =>
@@ -185,10 +290,6 @@ export default function CourseForm({
         setShowForm("");
         alert(
           `Tanfolyam sikeresen ${mode === "create" ? "Létrehozva" : "szerkesztve"}!`,
-        );
-      } else {
-        alert(
-          "Érvénytelen időpont formátum! Kérlek adj meg érvényes időpontot.",
         );
       }
     } catch (error: unknown) {
@@ -296,80 +397,138 @@ export default function CourseForm({
             </select>
           )}
         </div>
-        <div className="col-span-2">
-          <label className="font-semibold block mb-1">Időpont</label>
-          <div className="flex gap-2">
-            <select
-              name="year"
-              value={form.year}
-              onChange={handleFormChange}
-              className="p-2 rounded-md bg-white/30 text-gray-700 cursor-pointer shadow-md hover:bg-white duration-200 ease-in-out"
-              required
+        <div className="col-span-2 space-y-3">
+          <label className="font-semibold block">Időpontok</label>
+          {sessions.map((session, index) => (
+            <div
+              key={`session-${index}`}
+              className="grid grid-cols-1 md:grid-cols-12 gap-2 items-end"
             >
-              <option value="">Év</option>
-              {years.map((year) => (
-                <option key={year} value={year}>
-                  {year}
-                </option>
-              ))}
-            </select>
-            <select
-              name="month"
-              value={form.month}
-              onChange={handleFormChange}
-              className="p-2 rounded-md bg-white/30 text-gray-700 cursor-pointer shadow-md hover:bg-white duration-200 ease-in-out"
-              required
+              <select
+                value={session.year}
+                onChange={(event) =>
+                  handleSessionChange(index, "year", event.target.value)
+                }
+                className="p-2 rounded-md bg-white/30 text-gray-700 cursor-pointer shadow-md hover:bg-white duration-200 ease-in-out md:col-span-2"
+                required
+              >
+                <option value="">Év</option>
+                {years.map((year) => (
+                  <option key={year} value={year}>
+                    {year}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={session.month}
+                onChange={(event) =>
+                  handleSessionChange(index, "month", event.target.value)
+                }
+                className="p-2 rounded-md bg-white/30 text-gray-700 cursor-pointer shadow-md hover:bg-white duration-200 ease-in-out md:col-span-2"
+                required
+              >
+                <option value="">Hónap</option>
+                {months.map((month) => (
+                  <option key={month} value={month}>
+                    {month}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={session.day}
+                onChange={(event) =>
+                  handleSessionChange(index, "day", event.target.value)
+                }
+                className="p-2 rounded-md bg-white/30 text-gray-700 cursor-pointer shadow-md hover:bg-white duration-200 ease-in-out md:col-span-2"
+                required
+              >
+                <option value="">Nap</option>
+                {days.map((day) => (
+                  <option key={day} value={day}>
+                    {day}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={session.startHour}
+                onChange={(event) =>
+                  handleSessionChange(index, "startHour", event.target.value)
+                }
+                className="p-2 rounded-md bg-white/30 text-gray-700 cursor-pointer shadow-md hover:bg-white duration-200 ease-in-out md:col-span-1"
+                required
+              >
+                <option value="">Kezdő óra</option>
+                {hours.map((hour) => (
+                  <option key={hour} value={hour}>
+                    {hour}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={session.startMinute}
+                onChange={(event) =>
+                  handleSessionChange(index, "startMinute", event.target.value)
+                }
+                className="p-2 rounded-md bg-white/30 text-gray-700 cursor-pointer shadow-md hover:bg-white duration-200 ease-in-out md:col-span-1"
+                required
+              >
+                <option value="">Kezdő perc</option>
+                {minutes.map((minute) => (
+                  <option key={minute} value={minute}>
+                    {minute}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={session.endHour}
+                onChange={(event) =>
+                  handleSessionChange(index, "endHour", event.target.value)
+                }
+                className="p-2 rounded-md bg-white/30 text-gray-700 cursor-pointer shadow-md hover:bg-white duration-200 ease-in-out md:col-span-1"
+                required
+              >
+                <option value="">Záró óra</option>
+                {hours.map((hour) => (
+                  <option key={hour} value={hour}>
+                    {hour}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={session.endMinute}
+                onChange={(event) =>
+                  handleSessionChange(index, "endMinute", event.target.value)
+                }
+                className="p-2 rounded-md bg-white/30 text-gray-700 cursor-pointer shadow-md hover:bg-white duration-200 ease-in-out md:col-span-1"
+                required
+              >
+                <option value="">Záró perc</option>
+                {minutes.map((minute) => (
+                  <option key={minute} value={minute}>
+                    {minute}
+                  </option>
+                ))}
+              </select>
+              {isModular && sessions.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() => removeSession(index)}
+                  className="px-3 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 md:col-span-2"
+                >
+                  Alkalom törlése
+                </button>
+              )}
+            </div>
+          ))}
+          {isModular && (
+            <button
+              type="button"
+              onClick={addSession}
+              className="px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
             >
-              <option value="">Hónap</option>
-              {months.map((month) => (
-                <option key={month} value={month}>
-                  {month}
-                </option>
-              ))}
-            </select>
-            <select
-              name="day"
-              value={form.day}
-              onChange={handleFormChange}
-              className="p-2 rounded-md bg-white/30 text-gray-700 cursor-pointer shadow-md hover:bg-white duration-200 ease-in-out"
-              required
-            >
-              <option value="">Nap</option>
-              {days.map((day) => (
-                <option key={day} value={day}>
-                  {day}
-                </option>
-              ))}
-            </select>
-            <select
-              name="hour"
-              value={form.hour}
-              onChange={handleFormChange}
-              className="p-2 rounded-md bg-white/30 text-gray-700 cursor-pointer shadow-md hover:bg-white duration-200 ease-in-out"
-              required
-            >
-              <option value="">Óra</option>
-              {hours.map((hour) => (
-                <option key={hour} value={hour}>
-                  {hour}
-                </option>
-              ))}
-            </select>
-            <select
-              name="minute"
-              value={form.minute}
-              onChange={handleFormChange}
-              className="p-2 rounded-md bg-white/30 text-gray-700 cursor-pointer shadow-md hover:bg-white duration-200 ease-in-out"
-              required
-            >
-              <option value="">Perc</option>
-              {minutes.map((minute) => (
-                <option key={minute} value={minute}>
-                  {minute}
-                </option>
-              ))}
-            </select>
-          </div>
+              + Új alkalom
+            </button>
+          )}
         </div>
       </div>
       <div>

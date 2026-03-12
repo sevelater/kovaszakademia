@@ -14,6 +14,8 @@ interface Course {
   description?: string;
   categories: string[];
   datetime?: string;
+  endDatetime?: string;
+  sessions?: { start: string; end: string }[];
   images?: string[];
   maxCapacity: number;
   registeredUsers: { uid: string; displayName: string }[];
@@ -31,14 +33,34 @@ interface Props {
 
 
 
+const getCourseSessions = (course: Course): { start: string; end: string }[] => {
+  if (course.sessions && course.sessions.length > 0) {
+    return course.sessions.filter((session) => session.start);
+  }
+  if (!course.datetime) return [];
+  const start = course.datetime;
+  const startDate = new Date(start);
+  if (Number.isNaN(startDate.getTime())) return [];
+  const end =
+    course.endDatetime ||
+    new Date(startDate.getTime() + 2 * 60 * 60 * 1000).toISOString();
+  return [{ start, end }];
+};
+
+const isCourseActive = (course: Course): boolean => {
+  const sessions = getCourseSessions(course);
+  if (sessions.length === 0) return true;
+  const lastEnd = sessions
+    .map((session) => new Date(session.end))
+    .filter((date) => !Number.isNaN(date.getTime()))
+    .sort((a, b) => b.getTime() - a.getTime())[0];
+  if (!lastEnd) return true;
+  return lastEnd.getTime() >= Date.now();
+};
+
 const CourseList: React.FC<Props> = ({ courses, isAdmin, setShowForm, setCourses, user, setShowLoginModal }) => {
   
-  const activeCourses = courses.filter((course) => {
-  if (!course.datetime) return true;
-  const courseDate = new Date(course.datetime);
-  if (Number.isNaN(courseDate.getTime())) return true;
-  return courseDate.getTime() >= Date.now();
-});
+  const activeCourses = courses.filter((course) => isCourseActive(course));
   
   return (
     <div className="w-80 bg-white p-4 rounded-lg shadow-lg max-h-[calc(100vh-400px)] overflow-y-auto">

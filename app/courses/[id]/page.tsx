@@ -17,6 +17,8 @@ interface Course {
   description?: string;
   categories: string[];
   datetime?: string;
+  endDatetime?: string;
+  sessions?: { start: string; end: string }[];
   images?: string[];
   maxCapacity: number;
   registeredUsers: { uid: string; displayName: string }[];
@@ -26,11 +28,30 @@ const stripePromise = loadStripe(
   process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!,
 );
 
+const getCourseSessions = (course: Course | null): { start: string; end: string }[] => {
+  if (!course) return [];
+  if (course.sessions && course.sessions.length > 0) {
+    return course.sessions.filter((session) => session.start);
+  }
+  if (!course.datetime) return [];
+  const start = course.datetime;
+  const startDate = new Date(start);
+  if (Number.isNaN(startDate.getTime())) return [];
+  const end =
+    course.endDatetime ||
+    new Date(startDate.getTime() + 2 * 60 * 60 * 1000).toISOString();
+  return [{ start, end }];
+};
+
 const isExpiredCourse = (course: Course | null): boolean => {
-  if (!course?.datetime) return false;
-  const courseDate = new Date(course.datetime);
-  if (Number.isNaN(courseDate.getTime())) return false;
-  return courseDate.getTime() < Date.now();
+  const sessions = getCourseSessions(course);
+  if (sessions.length === 0) return false;
+  const lastEnd = sessions
+    .map((session) => new Date(session.end))
+    .filter((date) => !Number.isNaN(date.getTime()))
+    .sort((a, b) => b.getTime() - a.getTime())[0];
+  if (!lastEnd) return false;
+  return lastEnd.getTime() < Date.now();
 };
 
 const CourseDetails: React.FC = () => {
@@ -81,10 +102,22 @@ const CourseDetails: React.FC = () => {
   }, []);
 
   useEffect(() => {
+  if (!user || !course) return;
+
+  const registered = course.registeredUsers?.some(
+    (u) => u.uid === user.uid
+  );
+
+  setIsRegistered(registered || false);
+}, [user, course]);
+
+  useEffect(() => {
     if (!id || typeof id !== "string") {
       setLoading(false);
       return;
-    }
+    };
+
+    
 
     const fetchCourse = async () => {
       try {
@@ -103,17 +136,14 @@ const CourseDetails: React.FC = () => {
             description: data.description,
             categories: data.categories || [],
             datetime: data.datetime,
+            endDatetime: data.endDatetime,
+            sessions: data.sessions,
             images: data.images,
             maxCapacity: data.maxCapacity || 8,
             registeredUsers: data.registeredUsers || [],
           };
 
           setCourse(courseData);
-          if (user) {
-            setIsRegistered(
-              courseData.registeredUsers.some((u) => u.uid === user.uid),
-            );
-          }
         }
       } catch (error) {
         console.error("Hiba a tanfolyam betoltese soran:", error);
@@ -183,6 +213,7 @@ const CourseDetails: React.FC = () => {
 
       const paymentLink = `${process.env.NEXT_PUBLIC_BASE_URL}/courses/${course.id}?pay=true`;
 
+      const courseSessions = getCourseSessions(course);
       await fetch("/api/send-registration-email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -190,13 +221,15 @@ const CourseDetails: React.FC = () => {
           userName: user.displayName,
           userEmail: user.email,
           courseTitle: course.title,
-          courseDate: course.datetime,
+          courseDate: courseSessions[0]?.start || course.datetime,
+          courseEndDate: courseSessions[0]?.end || course.endDatetime,
+          courseSessions,
+          courseCategories: course.categories,
           courseId: course.id,
           location: course.location,
           paymentLink,
         }),
       });
-
       alert("Sikeres jelentkezés! Ellenőrizd az emailed a visszaigazolásért.");
     } catch (err) {
       console.error(err);
@@ -277,6 +310,7 @@ const CourseDetails: React.FC = () => {
   const remainingSpots = course.maxCapacity - course.registeredUsers.length;
   const isFull = remainingSpots <= 0;
   const isExpired = isExpiredCourse(course);
+  const sessions = getCourseSessions(course);
 
   return (
     <div className="p-6 flex gap-6 bg-(--first) min-h-screen">
@@ -356,18 +390,66 @@ const CourseDetails: React.FC = () => {
 
         <div className="bg-white rounded-lg shadow-lg  p-4 top-4">
           <h2 className="text-lg font-bold mb-2">Tanfolyam adatai</h2>
-          <p className="text-gray-600 mb-2">
-            Időpont:{" "}
-            {course.datetime
-              ? new Date(course.datetime).toLocaleString("hu-HU", {
+          <div className="text-gray-600 mb-2">
+            <span>Időpont: </span>
+            {sessions.length === 0 ? (
+              <span>Nincs megadva</span>
+            ) : sessions.length === 1 ? (
+              (() => {
+                const startDate = new Date(sessions[0].start);
+                const endDate = new Date(sessions[0].end);
+                if (Number.isNaN(startDate.getTime())) {
+                  return <span>Nincs megadva</span>;
+                }
+                const startLabel = startDate.toLocaleString("hu-HU", {
                   year: "numeric",
                   month: "long",
                   day: "numeric",
                   hour: "2-digit",
                   minute: "2-digit",
-                })
-              : "Nincs megadva"}
-          </p>
+                });
+                const endLabel = Number.isNaN(endDate.getTime())
+                  ? null
+                  : endDate.toLocaleTimeString("hu-HU", {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    });
+                return (
+                  <span>
+                    {startLabel}
+                    {endLabel ? ` – ${endLabel}` : ""}
+                  </span>
+                );
+              })()
+            ) : (
+              <ul className="mt-1 space-y-1">
+                {sessions.map((session, index) => {
+                  const startDate = new Date(session.start);
+                  const endDate = new Date(session.end);
+                  if (Number.isNaN(startDate.getTime())) return null;
+                  const startLabel = startDate.toLocaleString("hu-HU", {
+                    year: "numeric",
+                    month: "long",
+                    day: "numeric",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  });
+                  const endLabel = Number.isNaN(endDate.getTime())
+                    ? null
+                    : endDate.toLocaleTimeString("hu-HU", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      });
+                  return (
+                    <li key={`${session.start}-${index}`} className="text-gray-600">
+                      {startLabel}
+                      {endLabel ? ` – ${endLabel}` : ""}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
           <p className="text-gray-600 mb-2">Ár: {course.price} Ft</p>
           <p
             className={`text-lg mb-4 ${isFull || isExpired ? "text-red-500" : "text-green-500"}`}

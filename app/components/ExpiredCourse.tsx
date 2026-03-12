@@ -16,6 +16,8 @@ interface Course {
   description?: string;
   categories: string[];
   datetime?: string;
+  endDatetime?: string;
+  sessions?: { start: string; end: string }[];
   images?: string[];
   maxCapacity: number;
   registeredUsers: { uid: string; displayName: string }[];
@@ -29,7 +31,36 @@ interface Props {
   setShowLoginModal?: React.Dispatch<React.SetStateAction<boolean>>;
   user?: User | null;
   hideAdminActions?: boolean;
+  displayStart?: string;
+  displayEnd?: string;
 }
+
+const getCourseSessions = (course: Course): { start: string; end: string }[] => {
+  if (course.sessions && course.sessions.length > 0) {
+    return course.sessions.filter((session) => session.start);
+  }
+  if (!course.datetime) return [];
+  const start = course.datetime;
+  const startDate = new Date(start);
+  if (Number.isNaN(startDate.getTime())) return [];
+  const end =
+    course.endDatetime ||
+    new Date(startDate.getTime() + 2 * 60 * 60 * 1000).toISOString();
+  return [{ start, end }];
+};
+
+const getPrimarySession = (course: Course) => {
+  const sessions = getCourseSessions(course);
+  if (sessions.length === 0) return null;
+  const sorted = sessions
+    .map((session) => ({
+      session,
+      startDate: new Date(session.start),
+    }))
+    .filter((item) => !Number.isNaN(item.startDate.getTime()))
+    .sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
+  return sorted.length > 0 ? sorted[0].session : sessions[0];
+};
 
 const CourseCard: React.FC<Props> = ({
   course,
@@ -39,6 +70,8 @@ const CourseCard: React.FC<Props> = ({
   setShowLoginModal,
   user,
   hideAdminActions,
+  displayStart,
+  displayEnd,
 }) => {
   const router = useRouter();
   const [showRegistrantInfo, setShowRegistrantInfo] = useState(false);
@@ -50,11 +83,15 @@ const CourseCard: React.FC<Props> = ({
   }, [course.id, router]);
 
   const isExpired = useMemo(() => {
-    if (!course.datetime) return false;
-    const courseDate = new Date(course.datetime);
-    if (Number.isNaN(courseDate.getTime())) return false;
-    return courseDate.getTime() < Date.now();
-  }, [course.datetime]);
+    const sessions = getCourseSessions(course);
+    if (sessions.length === 0) return false;
+    const lastEnd = sessions
+      .map((session) => new Date(session.end))
+      .filter((date) => !Number.isNaN(date.getTime()))
+      .sort((a, b) => b.getTime() - a.getTime())[0];
+    if (!lastEnd) return false;
+    return lastEnd.getTime() < Date.now();
+  }, [course]);
 
   const handleDelete = async () => {
     if (!isAdmin) {
@@ -98,6 +135,11 @@ const CourseCard: React.FC<Props> = ({
       ? course.maxCapacity - course.registeredUsers.length
       : null;
   const isFull = remainingSpots !== null && remainingSpots <= 0;
+  const sessions = getCourseSessions(course);
+  const primarySession = getPrimarySession(course);
+  const displaySessionStart = displayStart || primarySession?.start;
+  const displaySessionEnd = displayEnd || primarySession?.end;
+  const hasMultipleSessions = sessions.length > 1;
 
   return (
     <li
@@ -159,16 +201,36 @@ const CourseCard: React.FC<Props> = ({
           className={`text-sm text-gray-600 ${isExpired && isAdmin ? "line-through" : ""}`}
         >
           Időpont:{" "}
-          {course.datetime
-            ? new Date(course.datetime).toLocaleString("hu-HU", {
-                year: "numeric",
-                month: "long",
-                day: "numeric",
-                hour: "2-digit",
-                minute: "2-digit",
-              })
+          {displaySessionStart
+            ? (() => {
+                const startDate = new Date(displaySessionStart);
+                const endDate = displaySessionEnd
+                  ? new Date(displaySessionEnd)
+                  : null;
+                if (Number.isNaN(startDate.getTime())) return "Nincs megadva";
+                const startLabel = startDate.toLocaleString("hu-HU", {
+                  year: "numeric",
+                  month: "long",
+                  day: "numeric",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                });
+                const endLabel =
+                  endDate && !Number.isNaN(endDate.getTime())
+                    ? endDate.toLocaleTimeString("hu-HU", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })
+                    : null;
+                return endLabel ? `${startLabel} – ${endLabel}` : startLabel;
+              })()
             : "Nincs megadva"}
         </p>
+        {hasMultipleSessions && !displayStart && (
+          <p className="text-xs text-gray-500 mt-1">
+            További alkalmak: {sessions.length - 1}
+          </p>
+        )}
         <p
           className={`text-sm mt-1 ${isExpired && isAdmin ? "line-through" : ""}`}
         >
