@@ -23,7 +23,7 @@ export async function POST(req: Request) {
   const formatDate = (d: Date) => d.toISOString().replace(/-|:|\.\d+/g, "");
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL
   ? process.env.NEXT_PUBLIC_SITE_URL.replace(/\/$/, "")
-  : "https://kovaszakademia.vercel.app"; // ide tegyél valami default publikus URL-t
+  : "https://kovaszakademia.vercel.app";
 
   const modularCategory = "Moduláris képzéseink";
   const courseCategories: string[] = Array.isArray(body.courseCategories)
