@@ -9,10 +9,18 @@ export async function POST(req: Request) {
     `${process.env.NEXT_PUBLIC_SITE_URL}/api/unregister` +
     `?courseId=${body.courseId}&email=${body.userEmail}`;
 
+  const startDate = new Date(body.courseDate!);
+  const endDate = new Date(startDate.getTime() + 2 * 60 * 60 * 1000); // 2 órás kurzus, módosítható---------------------------------------------
+
+  const formatDate = (d: Date) => d.toISOString().replace(/-|:|\.\d+/g, "");
+
   const calendarLink =
     `https://calendar.google.com/calendar/render?action=TEMPLATE` +
     `&text=${encodeURIComponent(body.courseTitle)}` +
-    `&dates=${body.courseDate}`;
+    `&dates=${formatDate(startDate)}/${formatDate(endDate)}` +
+    `&details=${encodeURIComponent("Jelentkezésed visszaigazolva. Ellenőrizd az emailed.")}` +
+    `&location=${encodeURIComponent(body.location || "Helyszín hamarosan")}` +
+    `&sf=true&output=xml`;
 
   const html = `
   <div style="font-family:Arial;background:#f5f5f5;padding:40px">
@@ -103,8 +111,8 @@ export async function POST(req: Request) {
   `;
 
   await resend.emails.send({
-    from: "Péksuli <selmeczi.vilmos.vazul@gmail.com>",
-    to: [body.userEmail, process.env.ADMIN_EMAIL!],
+    from: process.env.RESEND_FROM_EMAIL!,
+    to: body.userEmail,
     subject: `Jelentkezés visszaigazolás – ${body.courseTitle}`,
     html,
   });

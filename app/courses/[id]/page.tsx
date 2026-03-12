@@ -29,8 +29,7 @@ interface Course {
 }
 
 const stripePromise = loadStripe(
-  process.env
-    .pk_test_51RpMxOCjFsFckpeAKq3NdMTv8rOCdKBA1jIpx4ca2XYQ33R0JXyi0cEpZrv0XG5p5TQIvAcLtHbbgzH7GsrvLd0700bM9V0KuJ!,
+  process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!,
 );
 
 const isExpiredCourse = (course: Course | null): boolean => {
@@ -52,6 +51,21 @@ const CourseDetails: React.FC = () => {
   const [isRegistered, setIsRegistered] = useState<boolean>(false);
   const [currentImg, setCurrentImg] = useState<number>(0);
   const [paymentLoading, setPaymentLoading] = useState<boolean>(false);
+  const [showPaymentSuccess, setShowPaymentSuccess] = useState(false);
+  const [showPaymentCancel, setShowPaymentCancel] = useState(false);
+
+  useEffect(() => {
+    const success = searchParams.get("success");
+    const cancel = searchParams.get("cancel");
+
+    if (success === "true") {
+      setShowPaymentSuccess(true);
+    }
+
+    if (cancel === "true") {
+      setShowPaymentCancel(true);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(async (currentUser) => {
@@ -117,19 +131,31 @@ const CourseDetails: React.FC = () => {
     fetchCourse();
   }, [id, user]);
 
-  const registerUser = async (): Promise<boolean> => {
-    if (authLoading || !user) return false;
+  const registerUser = async () => {
+    if (authLoading || !user) {
+      alert("Kérlek jelentkezz be a jelentkezéshez!");
+      return;
+    }
     if (!course || isExpiredCourse(course)) {
       alert("Nem lehet jelentkezni erre a kurzusra.");
-      return false;
+      return;
     }
     if (course.registeredUsers.length >= course.maxCapacity) {
       alert("A kurzus betelt!");
-      return false;
+      return;
     }
+
+    if (!course?.id) {
+      alert("Érvénytelen kurzus!");
+      return;
+    }
+
+    const courseId = course.id;
 
     try {
       const courseRef = doc(db, "courses", course.id!);
+
+      // Firestore update
       await updateDoc(courseRef, {
         registeredUsers: arrayUnion({
           uid: user.uid,
@@ -155,7 +181,9 @@ const CourseDetails: React.FC = () => {
       );
       setIsRegistered(true);
 
-      // Email küldés + ICS + Google Calendar link
+      const paymentLink = `${process.env.NEXT_PUBLIC_BASE_URL}/courses/${courseId}?pay=true`;
+
+      // Email küldés Resend-del
       await fetch("/api/send-registration-email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -166,75 +194,49 @@ const CourseDetails: React.FC = () => {
           courseDate: course.datetime,
           courseId: course.id,
           location: course.location,
+          paymentLink,
         }),
       });
 
-      return true;
+      alert("Sikeres jelentkezés! Ellenőrizd az emailed a visszaigazolásért.");
     } catch (err) {
       console.error(err);
-      return false;
+      alert("Hiba történt a jelentkezés során.");
     }
   };
 
-const handleUnregister = async () => {
-  if (!user || !user.uid) {
-    alert("Érvénytelen felhasználó!");
-    return;
-  }
-
-  if (!course?.id) {
-    alert("Érvénytelen kurzus!");
-    return;
-  }
-
-  const courseRef = doc(db, "courses", course.id); // course.id használata
-  const courseSnap = await getDoc(courseRef);
-
-  if (!courseSnap.exists()) {
-    alert("A kurzus nem létezik!");
-    return;
-  }
-
-  const currentUsers = courseSnap.data()?.registeredUsers || [];
-  const isRegistered = currentUsers.some(
-    (u: { uid: string; displayName: string }) => u.uid === user.uid
-  );
-
-  if (!isRegistered) {
-    alert("Nem vagy jelentkezve erre a kurzusra!");
-    return;
-  }
-
-  await updateDoc(courseRef, {
-    registeredUsers: arrayRemove({
-      uid: user.uid,
-      displayName: user.displayName || "Névtelen",
-    }),
-  });
-
-  setCourse(prev => prev ? {
-    ...prev,
-    registeredUsers: prev.registeredUsers.filter(u => u.uid !== user.uid)
-  } : prev);
-
-  setIsRegistered(false);
-  alert("Jelentkezés sikeresen visszavonva!");
-};
-
   const handlePayment = async () => {
     if (!user || !course) return;
+
     setPaymentLoading(true);
+
     try {
       const stripe = await stripePromise;
+
       const res = await fetch("/api/create-checkout-session", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ courseId: course.id, userEmail: user.email }),
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          courseId: course.id,
+          userEmail: user.email,
+        }),
       });
+
       const data = await res.json();
-      await stripe?.redirectToCheckout({ sessionId: data.sessionId });
-    } catch (err) {
-      console.error(err);
+
+      if (!data.sessionId) {
+        console.error("Stripe session hiba:", data);
+        alert("Nem sikerült elindítani a fizetést.");
+        return;
+      }
+
+      await stripe?.redirectToCheckout({
+        sessionId: data.sessionId,
+      });
+    } catch (error) {
+      console.error("Stripe hiba:", error);
     } finally {
       setPaymentLoading(false);
     }
@@ -279,7 +281,7 @@ const handleUnregister = async () => {
     <div className="p-6 flex gap-6 bg-(--first) min-h-screen">
       <button
         onClick={() => router.push("/")}
-        className="text-(--second) font-medium tracking-wider p-1.5 rounded-md backdrop-blur-3xl bg-(--fifth) h-min duration-200 ease-in-out hover:bg-(--fifth)/50"
+        className="text-(--second) font-medium h-min tracking-wider bg-(--fifth)/30 p-1.5 duration-200 ease-in-out hover:bg-(--fifth)/50"
       >
         Piactér
       </button>
@@ -290,7 +292,7 @@ const handleUnregister = async () => {
             <>
               <img
                 src={imgs[currentImg]}
-                alt={`Kep ${currentImg + 1}`}
+                alt={`Kép ${currentImg + 1}`}
                 className="object-cover w-full h-full"
               />
               {imgs.length > 1 && (
@@ -376,32 +378,26 @@ const handleUnregister = async () => {
                 : `Már csak ${remainingSpots} hely van!`}
           </p>
 
-          {!isRegistered && (
-            <button
-              onClick={registerUser}
-              className="bg-blue-500 text-white p-2 rounded-md"
-            >
-              Jelentkezés
-            </button>
-          )}
-          {isRegistered && (
-            <>
+          <div className="flex gap-x-2">
+            {!isRegistered && !isFull && !isExpired && (
               <button
-                onClick={handleUnregister}
-                className="bg-red-500 text-white p-2 rounded-md"
+                onClick={registerUser}
+                className="w-full bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 mb-2"
               >
-                Lemondás
+                Jelentkezés
               </button>
+            )}
+
+            {isRegistered && (
               <button
                 onClick={handlePayment}
-                className="bg-green-500 text-white p-2 rounded-md"
+                className="w-full bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600 mb-2"
                 disabled={paymentLoading}
               >
-                Fizetés
+                {paymentLoading ? "Fizetés folyamatban..." : "Fizetés"}
               </button>
-            </>
-          )}
-
+            )}
+          </div>
           {isAdmin && course.registeredUsers.length > 0 && (
             <div className="mt-4">
               <h3 className="text-lg font-semibold mb-2">Jelentkezök</h3>
@@ -416,6 +412,63 @@ const handleUnregister = async () => {
           )}
         </div>
       </div>
+      {showPaymentSuccess && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-xl p-6 max-w-md text-center animate-fade-in">
+            <h2 className="text-2xl font-bold text-green-600 mb-2">
+              🎉 Sikeres fizetés!
+            </h2>
+
+            <p className="text-gray-600 mb-4">
+              A helyedet sikeresen lefoglaltuk a kurzusra.
+            </p>
+
+            <p className="text-gray-600 mb-6">
+              A részleteket és a kurzus információkat elküldtük emailben. Kérlek
+              ellenőrizd a postaládádat! 📩
+            </p>
+
+            <button
+              onClick={() => {
+                setShowPaymentSuccess(false);
+                router.replace(`/courses/${course.id}`, { scroll: false });
+              }}
+              className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-md"
+            >
+              Rendben
+            </button>
+          </div>
+        </div>
+      )}
+      {showPaymentCancel && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-xl p-6 max-w-md text-center">
+            <h2 className="text-2xl font-bold text-orange-500 mb-2">
+              ⚠️ Fizetés megszakítva
+            </h2>
+
+            <p className="text-gray-600 mb-6">
+              Úgy tűnik a fizetés nem lett befejezve. A helyed még nincs
+              lefoglalva.
+            </p>
+
+            <p className="text-gray-600 mb-6">
+              Ha szeretnél részt venni a kurzuson, bármikor újra megpróbálhatod
+              a fizetést.
+            </p>
+
+            <button
+              onClick={() => {
+                setShowPaymentCancel(false);
+                router.replace(`/courses/${course.id}`, { scroll: false });
+              }}
+              className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-md"
+            >
+              Újrapróbálom
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
