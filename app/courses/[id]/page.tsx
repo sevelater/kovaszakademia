@@ -175,24 +175,26 @@ const CourseDetails: React.FC = () => {
       );
       setIsRegistered(true);
 
-      const paymentLink = `${process.env.NEXT_PUBLIC_BASE_URL}/courses/${courseId}?pay=true`;
+      // fetch email és payment link csak akkor, ha minden adat rendelkezésre áll
+      if (!user || !user.email || !course?.id) {
+        alert("Hiba: hiányzó adatok a jelentkezéshez!");
+        return;
+      }
 
-      // Email küldés Resend-del
-      const emailData = {
-        userName: user.displayName,
-        userEmail: user.email,
-        courseTitle: course.title,
-        courseDate: course.datetime,
-        courseId: course.id,
-        location: course.location,
-        paymentLink,
-      };
+      const paymentLink = `${process.env.NEXT_PUBLIC_BASE_URL}/courses/${course.id}?pay=true`;
 
-      console.log("Sending email to:", emailData.userEmail); // <-- itt már jó
       await fetch("/api/send-registration-email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(emailData),
+        body: JSON.stringify({
+          userName: user.displayName,
+          userEmail: user.email,
+          courseTitle: course.title,
+          courseDate: course.datetime,
+          courseId: course.id,
+          location: course.location,
+          paymentLink,
+        }),
       });
 
       alert("Sikeres jelentkezés! Ellenőrizd az emailed a visszaigazolásért.");
