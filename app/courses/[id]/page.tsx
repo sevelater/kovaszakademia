@@ -225,9 +225,11 @@ const CourseDetails: React.FC = () => {
 
       const data = await res.json();
 
-      if (!data.sessionId) {
-        console.error("Stripe session hiba:", data);
-        alert("Nem sikerült elindítani a fizetést.");
+      if (!res.ok) {
+        console.error("Stripe session backend hiba:", data);
+        alert(
+          "Hiba a fizetés indításakor: " + (data.error || "Ismeretlen hiba"),
+        );
         return;
       }
 
